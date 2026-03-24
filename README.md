@@ -62,8 +62,9 @@ An autonomous multi-agent system that "thinks" through inventory challenges by a
 
 ---
 
-## System Design Diagram
+### System Design Diagram
 
+```mermaid
 graph TD
 %% Define Nodes and Styles
 classDef llm fill:#f9f,stroke:#333,stroke-width:2px;
@@ -108,3 +109,4 @@ classDef state fill:#dfd,stroke:#333,stroke-width:1px;
 
     %% Final Output
     Orchestrator -->|Final Goal Achieved| Proposal[Generate Structured<br/>Restock Proposal]
+```
