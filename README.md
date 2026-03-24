@@ -145,9 +145,10 @@ Do not commit `.env` or real API keys to git.
 1. Open the hosted app URL.
 2. Run `SKU-001` in mock mode.
 3. Confirm you see:
-  - live PLAN → ACT → REFLECT steps,
-  - Markdown and JSON proposal tabs,
-  - approval buttons and status update.
+
+- live PLAN → ACT → REFLECT steps,
+- Markdown and JSON proposal tabs,
+- approval buttons and status update.
 
 ### Troubleshooting
 

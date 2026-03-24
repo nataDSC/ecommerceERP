@@ -15,7 +15,7 @@ from ecommerce_erp.agent.orchestrator import build_graph, make_initial_state
 load_dotenv()
 
 st.set_page_config(
-    page_title="ecommerceERP Inventory Agent",
+    page_title="Ecommerce ERP Inventory Agent",
     page_icon="📦",
     layout="wide",
 )
@@ -211,7 +211,7 @@ def _render_results() -> None:
 def main() -> None:
     _init_session_state()
 
-    st.title("ecommerceERP Inventory Agent")
+    st.title("Ecommerce ERP Inventory Agent")
     st.caption("Phase 1 demo: public Streamlit UI for Plan → Act → Reflect")
 
     with st.sidebar:
