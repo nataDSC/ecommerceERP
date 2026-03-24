@@ -8,3 +8,5 @@ venv/
 .mypy_cache/
 .coverage
 htmlcov/
+logs/
+reasoning_trace.log

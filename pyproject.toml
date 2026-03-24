@@ -8,7 +8,19 @@ version = "0.1.0"
 description = "Minimal Python application scaffold"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+    "tavily-python>=0.5",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+]
 
 [project.scripts]
 ecommerce-erp = "ecommerce_erp.main:main"
