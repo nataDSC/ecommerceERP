@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
+from langgraph.types import interrupt
 
 from ecommerce_erp.agent.guardrails import CostGuardError, check_cost_guard
 from ecommerce_erp.agent.state import AgentState, ApprovalStatus, Phase, ReasoningStep
@@ -54,10 +56,10 @@ def plan_node(state: AgentState) -> dict[str, Any]:
 
     if error:
         thought = f"[PLAN] Error in prior step: '{error}'. Halting agent loop."
-        step = _make_step(Phase.PLAN, thought)
+        step = _make_step(Phase.PLAN.value, thought)
         return {
             "plan": [],
-            "current_phase": Phase.PLAN,
+            "current_phase": Phase.PLAN.value,
             "reasoning_steps": [step],
             "goal_satisfied": True,
         }
@@ -75,10 +77,10 @@ def plan_node(state: AgentState) -> dict[str, Any]:
             f"[PLAN] SKU '{state['sku']}' does not exist in the ERP system. "
             "Cannot proceed — terminating loop."
         )
-        step = _make_step(Phase.PLAN, thought)
+        step = _make_step(Phase.PLAN.value, thought)
         return {
             "plan": [],
-            "current_phase": Phase.PLAN,
+            "current_phase": Phase.PLAN.value,
             "reasoning_steps": [step],
             "error": inventory.get("error", f"SKU '{state['sku']}' not found."),
             "goal_satisfied": True,
@@ -104,10 +106,10 @@ def plan_node(state: AgentState) -> dict[str, Any]:
             "structured restock proposal."
         )
 
-    step = _make_step(Phase.PLAN, thought, action=f"Queued sub-tasks: {new_plan}")
+    step = _make_step(Phase.PLAN.value, thought, action=f"Queued sub-tasks: {new_plan}")
     return {
         "plan": new_plan,
-        "current_phase": Phase.PLAN,
+        "current_phase": Phase.PLAN.value,
         "reasoning_steps": [step],
     }
 
@@ -120,11 +122,11 @@ def plan_node(state: AgentState) -> dict[str, Any]:
 def act_node(state: AgentState) -> dict[str, Any]:
     plan = state.get("plan", [])
     if not plan:
-        return {"current_phase": Phase.ACT}
+        return {"current_phase": Phase.ACT.value}
 
     task = plan[0]
     call_count = state.get("tool_calls_this_cycle", 0)
-    updates: dict[str, Any] = {"current_phase": Phase.ACT}
+    updates: dict[str, Any] = {"current_phase": Phase.ACT.value}
 
     # Cost-guard: only counts against external tool invocations
     if task in ("call_inventory_tool", "call_market_research_tool"):
@@ -132,9 +134,9 @@ def act_node(state: AgentState) -> dict[str, Any]:
             check_cost_guard(state)
         except CostGuardError as exc:
             msg = str(exc)
-            step = _make_step(Phase.ACT, msg)
+            step = _make_step(Phase.ACT.value, msg)
             return {
-                "current_phase": Phase.ACT,
+                "current_phase": Phase.ACT.value,
                 "error": msg,
                 "goal_satisfied": True,
                 "reasoning_steps": [step],
@@ -156,7 +158,7 @@ def act_node(state: AgentState) -> dict[str, Any]:
         else:
             obs = f"SKU not found: {result.get('error')}"
         step = _make_step(
-            Phase.ACT, thought,
+            Phase.ACT.value, thought,
             action="get_inventory_stats",
             observation=obs,
             tool_call_count=call_count,
@@ -177,7 +179,7 @@ def act_node(state: AgentState) -> dict[str, Any]:
             f"source={result.get('source')}"
         )
         step = _make_step(
-            Phase.ACT, thought,
+            Phase.ACT.value, thought,
             action="fetch_market_research",
             observation=obs,
             tool_call_count=call_count,
@@ -200,7 +202,7 @@ def act_node(state: AgentState) -> dict[str, Any]:
             f"restock_qty={proposal['json']['restock_quantity']} units. {approval_msg}"
         )
         step = _make_step(
-            Phase.ACT, thought,
+            Phase.ACT.value, thought,
             action="compute_restock",
             observation=obs,
             tool_call_count=call_count,
@@ -208,21 +210,21 @@ def act_node(state: AgentState) -> dict[str, Any]:
         )
         # Emit the human-in-the-loop pause signal to stdout and the trace log
         log_event(
-            phase=Phase.ACT,
+            phase=Phase.ACT.value,
             thought=approval_msg,
             action="human_in_the_loop",
             observation=approval_msg,
-            metadata={"sku": sku, "approval_status": "PENDING_APPROVAL"},
+            metadata={"sku": sku, "approval_status": ApprovalStatus.PENDING_APPROVAL.value},
         )
         print(f"\n{'─' * 64}")
         print(f"⚠️  {approval_msg}")
         print(f"{'─' * 64}\n")
         updates["final_recommendation"] = proposal
-        updates["approval_status"] = ApprovalStatus.PENDING_APPROVAL
+        updates["approval_status"] = ApprovalStatus.PENDING_APPROVAL.value
 
     else:
         thought = f"[ACT] Unknown task '{task}' in plan. Skipping."
-        step = _make_step(Phase.ACT, thought)
+        step = _make_step(Phase.ACT.value, thought)
 
     updates["reasoning_steps"] = [step]
     return updates
@@ -266,9 +268,9 @@ def reflect_node(state: AgentState) -> dict[str, Any]:
         )
         goal_satisfied = False
 
-    step = _make_step(Phase.REFLECT, thought)
+    step = _make_step(Phase.REFLECT.value, thought)
     return {
-        "current_phase": Phase.DONE if goal_satisfied else Phase.REFLECT,
+        "current_phase": Phase.DONE.value if goal_satisfied else Phase.REFLECT.value,
         "goal_satisfied": goal_satisfied,
         "reasoning_steps": [step],
     }
@@ -282,11 +284,63 @@ def _route_after_reflect(state: AgentState) -> str:
     return END if state.get("goal_satisfied", False) else "plan"
 
 
+def approval_node(state: AgentState) -> dict[str, Any]:
+    """
+    Pause execution for human approval when a recommendation is available.
+
+    Uses LangGraph's interrupt() so the graph thread can be resumed later
+    via Command(resume="APPROVED"|"REJECTED") from the UI.
+    """
+    recommendation = state.get("final_recommendation")
+    if recommendation is None:
+        return {"current_phase": Phase.ACT.value}
+
+    status = str(state.get("approval_status", ApprovalStatus.PENDING_APPROVAL.value))
+    if status in (ApprovalStatus.APPROVED.value, ApprovalStatus.REJECTED.value):
+        return {"current_phase": Phase.ACT.value}
+
+    sku = state.get("sku", "UNKNOWN")
+    decision = interrupt(
+        {
+            "type": "approval_required",
+            "message": f"ACTION REQUIRED: Awaiting Human Approval for SKU {sku}.",
+            "sku": sku,
+            "allowed_decisions": [ApprovalStatus.APPROVED.value, ApprovalStatus.REJECTED.value],
+        }
+    )
+
+    normalized = str(decision).strip().upper()
+    if normalized not in (ApprovalStatus.APPROVED.value, ApprovalStatus.REJECTED.value):
+        normalized = ApprovalStatus.REJECTED.value
+
+    thought = f"[APPROVAL] Human decision received for SKU '{sku}': {normalized}."
+    step = _make_step(
+        Phase.ACT.value,
+        thought,
+        action="human_approval_signal",
+        observation=f"approval_status={normalized}",
+        metadata={"sku": sku, "approval_status": normalized},
+    )
+
+    updated_recommendation = recommendation
+    if isinstance(recommendation, dict):
+        json_block = dict(recommendation.get("json", {}))
+        json_block["approval_status"] = normalized
+        updated_recommendation = {**recommendation, "json": json_block}
+
+    return {
+        "approval_status": normalized,
+        "final_recommendation": updated_recommendation,
+        "reasoning_steps": [step],
+        "current_phase": Phase.ACT.value,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Graph assembly
 # ---------------------------------------------------------------------------
 
-def build_graph() -> Any:
+def build_graph(*, human_in_the_loop: bool = False) -> Any:
     """
     Compile and return the LangGraph StateGraph implementing the
     Plan → Act → Reflect loop for inventory management.
@@ -296,16 +350,24 @@ def build_graph() -> Any:
     graph.add_node("plan", plan_node)
     graph.add_node("act", act_node)
     graph.add_node("reflect", reflect_node)
+    if human_in_the_loop:
+        graph.add_node("approval", approval_node)
 
     graph.set_entry_point("plan")
     graph.add_edge("plan", "act")
-    graph.add_edge("act", "reflect")
+    if human_in_the_loop:
+        graph.add_edge("act", "approval")
+        graph.add_edge("approval", "reflect")
+    else:
+        graph.add_edge("act", "reflect")
     graph.add_conditional_edges(
         "reflect",
         _route_after_reflect,
         {"plan": "plan", END: END},
     )
 
+    if human_in_the_loop:
+        return graph.compile(checkpointer=MemorySaver())
     return graph.compile()
 
 
@@ -317,10 +379,10 @@ def make_initial_state(sku: str) -> dict[str, Any]:
         "market_competitor_data": None,
         "reasoning_steps": [],
         "final_recommendation": None,
-        "approval_status": ApprovalStatus.PENDING_APPROVAL,
+        "approval_status": ApprovalStatus.PENDING_APPROVAL.value,
         "tool_calls_this_cycle": 0,
         "plan": [],
-        "current_phase": Phase.PLAN,
+        "current_phase": Phase.PLAN.value,
         "goal_satisfied": False,
         "error": None,
     }

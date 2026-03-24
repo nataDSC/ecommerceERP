@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from langgraph.types import Command
 
 from ecommerce_erp.agent.orchestrator import build_graph, make_initial_state
 
@@ -111,3 +112,22 @@ class TestCostGuardIntegration:
         assert result["error"] is not None
         assert "Cost-guard" in result["error"]
         assert result["final_recommendation"] is None
+
+
+class TestHumanApprovalInterrupt:
+    def test_graph_interrupts_and_resumes_with_approval(self, tmp_path: Path) -> None:
+        import os
+
+        os.environ["LOG_DIR"] = str(tmp_path)
+
+        graph = build_graph(human_in_the_loop=True)
+        config = {"configurable": {"thread_id": "approval-test-thread"}}
+
+        paused = graph.invoke(make_initial_state("SKU-001"), config=config)
+        assert "__interrupt__" in paused
+        assert paused["approval_status"] == "PENDING_APPROVAL"
+
+        resumed = graph.invoke(Command(resume="APPROVED"), config=config)
+        assert "__interrupt__" not in resumed
+        assert resumed["approval_status"] == "APPROVED"
+        assert resumed["final_recommendation"]["json"]["approval_status"] == "APPROVED"

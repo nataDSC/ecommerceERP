@@ -78,6 +78,121 @@ tail -f logs/reasoning_trace.log | python -m json.tool
 
 ---
 
+## Running the Streamlit demo (Phase 1)
+
+This phase is intentionally public-facing and does not include authentication.
+
+```bash
+# Make sure dependencies are installed
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Launch the Streamlit UI
+TAVILY_MOCK=true python -m streamlit run src/ecommerce_erp/ui/app.py
+```
+
+Open the local URL shown by Streamlit (usually http://localhost:8501).
+
+### Demo workflow
+
+1. Select a SKU in the sidebar.
+2. Toggle mock mode on/off.
+3. Click Run analysis.
+4. Observe live PLAN → ACT → REFLECT trace updates.
+5. Review output in Markdown and JSON tabs.
+6. Use Approve or Reject to simulate human-in-the-loop decisioning.
+
+---
+
+## Deploy to Streamlit Community Cloud (now)
+
+Use this for immediate public demo hosting.
+
+### 1. Push code to GitHub
+
+Ensure these files are in your repository:
+
+- `streamlit_app.py`
+- `requirements.txt`
+- `runtime.txt`
+
+### 2. Create the app in Streamlit Cloud
+
+1. Open Streamlit Community Cloud and click **New app**.
+2. Select your GitHub repo and branch.
+3. Set **Main file path** to `streamlit_app.py`.
+4. Click **Deploy**.
+
+### 3. Configure app secrets (recommended)
+
+In app settings, open **Secrets** and add one of these options:
+
+```toml
+# Option A: demo-safe mock mode (no API key needed)
+TAVILY_MOCK = "true"
+```
+
+```toml
+# Option B: live market research
+TAVILY_MOCK = "false"
+TAVILY_API_KEY = "your_real_key"
+```
+
+Do not commit `.env` or real API keys to git.
+
+### 4. Verify after deployment
+
+1. Open the hosted app URL.
+2. Run `SKU-001` in mock mode.
+3. Confirm you see:
+  - live PLAN → ACT → REFLECT steps,
+  - Markdown and JSON proposal tabs,
+  - approval buttons and status update.
+
+### Troubleshooting
+
+- If import errors occur, confirm **Main file path** is exactly `streamlit_app.py`.
+- If market calls fail in live mode, verify `TAVILY_API_KEY` in Secrets.
+- If app appears stale, use **Reboot app** from Streamlit settings.
+
+---
+
+## Productization roadmap
+
+### Phase 1 (current): Public Streamlit demo
+
+- Completed: interactive UI + live reasoning trace + dual output + approval simulation.
+
+### Phase 2: Service/API layer + auth
+
+- Add FastAPI backend.
+- Add authentication: basic auth (internal) and OAuth (external/public).
+- Move approval actions to API endpoints.
+
+### Phase 3: Persistence + audit
+
+- Add run/proposal persistence (SQLite first, Postgres later).
+- Add immutable audit trail for approval decisions.
+
+### Phase 4: Dockerization
+
+- Add production Dockerfile(s) and docker-compose.
+- Add health checks, env-based config, non-root runtime user.
+
+### Phase 5: Enterprise deployment (AWS-first)
+
+- Preferred path for popularity and speed:
+  - Containers on ECS Fargate or App Runner.
+  - ALB + ACM + Route53 for HTTPS and DNS.
+  - Secrets Manager for API keys.
+  - CloudWatch for logs/metrics/alarms.
+
+- Azure remains a strong option when your stack is Microsoft-first or needs
+  tighter Entra ID integration, but AWS is the practical default for broad
+  ecosystem familiarity.
+
+---
+
 ## Running the tests
 
 ```bash
@@ -159,7 +274,8 @@ An autonomous multi-agent system that "thinks" through inventory challenges by a
 
 ## Tech Stack
 
-- **Framework:** LangGraph / CrewAI
+- **Framework:** LangGraph
+- **UI:** Streamlit
 - **Search Tool:** Tavily / Perplexity API
 - **Database:** Simulated Spanner/SQL via Python Tooling
 
