@@ -102,6 +102,37 @@ def _proposal_markdown_for_display(markdown_text: str, hide_action_required: boo
     return "\n".join(filtered_lines)
 
 
+def _inject_sidebar_button_theme() -> None:
+    """Apply a custom navy style to the sidebar primary button (Run analysis)."""
+    st.markdown(
+        """
+        <style>
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"] {
+            background-color: #04143a;
+            border: 2px solid #9ec5ff;
+            color: #ffffff;
+            font-weight: 700;
+        }
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {
+            background-color: #0a2f84;
+            border-color: #d7e7ff;
+            color: #ffffff;
+        }
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"]:focus {
+            box-shadow: 0 0 0 0.25rem rgba(255, 215, 0, 0.45);
+            outline: none;
+        }
+        [data-testid="stSidebar"] div.stButton > button[kind="primary"]:disabled {
+            background-color: #5e6d8f;
+            border-color: #c9d3e6;
+            color: #f5f7fb;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _run_agent(sku: str, use_mock: bool) -> dict[str, Any]:
     os.environ["TAVILY_MOCK"] = "true" if use_mock else "false"
 
@@ -210,6 +241,7 @@ def _render_results() -> None:
 
 def main() -> None:
     _init_session_state()
+    _inject_sidebar_button_theme()
 
     st.title("Ecommerce ERP Inventory Agent")
     st.caption("Phase 1 demo: public Streamlit UI for Plan → Act → Reflect")
