@@ -158,6 +158,103 @@ Do not commit `.env` or real API keys to git.
 
 ---
 
+## Running the FastAPI service (Phase 2/3)
+
+The API layer now supports:
+
+- run orchestration endpoints,
+- approval decision submission,
+- approval audit-history reads,
+- configurable persistence backend (`sqlite` or `postgres`),
+- an auth-protected runtime config endpoint (`/api/v1/config`).
+
+### Start the API locally
+
+```bash
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Example: SQLite backend
+export API_DB_BACKEND=sqlite
+export API_DB_PATH=.data/api_runs.db
+export API_AUTH_ENABLED=false
+
+ecommerce-erp-api
+```
+
+### Typical local dev profiles
+
+Profile A: Fast local iteration (SQLite + auth off)
+
+```bash
+source .venv/bin/activate
+export API_DB_BACKEND=sqlite
+export API_DB_PATH=.data/api_runs.db
+export API_AUTH_ENABLED=false
+export TAVILY_MOCK=true
+
+ecommerce-erp-api
+```
+
+Profile B: Production-like local testing (Postgres + auth on)
+
+```bash
+source .venv/bin/activate
+export API_DB_BACKEND=postgres
+export API_POSTGRES_DSN='postgresql://<user>:<pass>@localhost:5432/ecommerce_erp'
+export API_AUTH_ENABLED=true
+export API_BASIC_AUTH_USER=<api_user>
+export API_BASIC_AUTH_PASS=<api_pass>
+export TAVILY_MOCK=true
+
+ecommerce-erp-api
+```
+
+Optional quick check in either profile:
+
+```bash
+curl -s http://localhost:8000/healthz | python -m json.tool
+```
+
+### Quick endpoint list
+
+- `GET /healthz`
+- `GET /api/v1/config`
+- `POST /api/v1/analyze`
+- `GET /api/v1/analyze/{run_id}`
+- `GET /api/v1/analyze/{run_id}/proposal`
+- `POST /api/v1/analyze/{run_id}/decision`
+- `GET /api/v1/analyze/{run_id}/approval-history`
+
+### `/api/v1/config` examples
+
+Auth disabled (`API_AUTH_ENABLED=false`):
+
+```bash
+curl -s http://localhost:8000/api/v1/config | python -m json.tool
+```
+
+Auth enabled (`API_AUTH_ENABLED=true`):
+
+```bash
+curl -s \
+  -u "<api_user>:<api_pass>" \
+  http://localhost:8000/api/v1/config | python -m json.tool
+```
+
+Expected shape:
+
+```json
+{
+  "db_backend": "sqlite",
+  "db_target": ".data/api_runs.db"
+}
+```
+
+For Postgres backend, `db_target` is intentionally sanitized and excludes user/password/query params.
+
+---
+
 ## Productization roadmap
 
 ### Phase 1 (current): Public Streamlit demo
@@ -166,14 +263,13 @@ Do not commit `.env` or real API keys to git.
 
 ### Phase 2: Service/API layer + auth
 
-- Add FastAPI backend.
-- Add authentication: basic auth (internal) and OAuth (external/public).
-- Move approval actions to API endpoints.
+- Completed: FastAPI backend with analyze/proposal/decision endpoints.
+- Completed: optional basic auth for protected API routes.
 
 ### Phase 3: Persistence + audit
 
-- Add run/proposal persistence (SQLite first, Postgres later).
-- Add immutable audit trail for approval decisions.
+- Completed: persistent run/proposal storage with backend switch (`sqlite`/`postgres`).
+- Completed: approval audit history endpoint.
 
 ### Phase 4: Dockerization
 
@@ -233,6 +329,14 @@ no live API calls are ever made during `pytest`.
 | `TAVILY_MOCK`              | `false`  | Set `true` for fully offline mock mode                   |
 | `MAX_TOOL_CALLS_PER_CYCLE` | `5`      | Cost-guard cap — halts the loop if exceeded              |
 | `LOG_DIR`                  | `./logs` | Directory where `reasoning_trace.log` is written         |
+| `API_HOST`                 | `0.0.0.0`| FastAPI bind host                                         |
+| `API_PORT`                 | `8000`   | FastAPI bind port                                         |
+| `API_AUTH_ENABLED`         | `false`  | Enable HTTP basic auth on API routes                      |
+| `API_BASIC_AUTH_USER`      | `admin`  | Username for API basic auth                               |
+| `API_BASIC_AUTH_PASS`      | `change_me` | Password for API basic auth                            |
+| `API_DB_BACKEND`           | `sqlite` | Persistence backend: `sqlite` or `postgres`              |
+| `API_DB_PATH`              | `.data/api_runs.db` | SQLite DB file path when backend is `sqlite`    |
+| `API_POSTGRES_DSN`         | —        | Postgres DSN when backend is `postgres`                  |
 
 ---
 

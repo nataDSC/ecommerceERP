@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from urllib.parse import urlparse
 from typing import Any
 
 import uvicorn
@@ -8,6 +9,8 @@ from fastapi import Depends, FastAPI, HTTPException, status
 
 from ecommerce_erp.api.auth import require_api_user
 from ecommerce_erp.api.models import (
+    ApprovalHistoryResponse,
+    ApiConfigResponse,
     AnalyzeRequest,
     AnalyzeResponse,
     DecisionRequest,
@@ -39,12 +42,35 @@ def _to_run_state_response(run_id: str, state: dict[str, Any]) -> RunStateRespon
     )
 
 
+def _sanitized_db_target() -> tuple[str, str]:
+    backend = os.getenv("API_DB_BACKEND", "sqlite").strip().lower()
+
+    if backend == "postgres":
+        dsn = os.getenv("API_POSTGRES_DSN", "")
+        if not dsn:
+            return backend, "not_configured"
+        parsed = urlparse(dsn)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 5432
+        db_name = parsed.path.lstrip("/") or "postgres"
+        # Deliberately omit username/password/query string to avoid leaking secrets.
+        return backend, f"{parsed.scheme}://{host}:{port}/{db_name}"
+
+    db_path = os.getenv("API_DB_PATH", ".data/api_runs.db")
+    return "sqlite", db_path
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="ecommerceERP API", version="0.2.0")
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/v1/config", response_model=ApiConfigResponse)
+    def get_api_config(_: str = Depends(require_api_user)) -> ApiConfigResponse:
+        backend, target = _sanitized_db_target()
+        return ApiConfigResponse(db_backend=backend, db_target=target)
 
     @app.post("/api/v1/analyze", response_model=AnalyzeResponse)
     def start_analysis(
@@ -111,6 +137,14 @@ def create_app() -> FastAPI:
                 detail="Run cannot be resumed from persisted state. Please start a new run.",
             )
         return _to_run_state_response(run_id, updated)
+
+    @app.get("/api/v1/analyze/{run_id}/approval-history", response_model=ApprovalHistoryResponse)
+    def get_approval_history(run_id: str, _: str = Depends(require_api_user)) -> ApprovalHistoryResponse:
+        try:
+            events = registry.get_approval_history(run_id)
+        except KeyError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+        return ApprovalHistoryResponse(run_id=run_id, events=events)
 
     return app
 

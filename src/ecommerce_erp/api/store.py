@@ -10,7 +10,7 @@ from typing import Any
 from langgraph.types import Command
 
 from ecommerce_erp.agent.orchestrator import build_graph, make_initial_state
-from ecommerce_erp.api.persistence import SQLiteRunPersistence
+from ecommerce_erp.api.persistence import RunPersistence, create_run_persistence
 
 
 @dataclass
@@ -26,7 +26,7 @@ class RunRegistry:
     def __init__(self) -> None:
         self._runs: dict[str, ApiRunSession] = {}
         self._lock = threading.Lock()
-        self._persistence = SQLiteRunPersistence()
+        self._persistence: RunPersistence = create_run_persistence()
 
     @staticmethod
     def _state_status(state: dict[str, Any]) -> str:
@@ -118,6 +118,15 @@ class RunRegistry:
             created_at=session.created_at,
         )
         return resumed
+
+    def get_approval_history(self, run_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            in_memory = self._runs.get(run_id) is not None
+
+        if not in_memory and self._persistence.fetch_run(run_id) is None:
+            raise KeyError(run_id)
+
+        return self._persistence.fetch_approval_events(run_id)
 
 
 registry = RunRegistry()

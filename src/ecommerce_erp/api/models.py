@@ -37,3 +37,20 @@ class ProposalResponse(BaseModel):
     approval_status: str | None = None
     proposal_json: dict[str, Any] | None = None
     proposal_markdown: str | None = None
+
+
+class ApprovalEventResponse(BaseModel):
+    id: int
+    decision: str
+    source: str
+    created_at: str
+
+
+class ApprovalHistoryResponse(BaseModel):
+    run_id: str
+    events: list[ApprovalEventResponse] = []
+
+
+class ApiConfigResponse(BaseModel):
+    db_backend: str
+    db_target: str
