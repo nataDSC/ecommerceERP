@@ -73,3 +73,55 @@ def test_auth_required_rejects_missing_credentials(monkeypatch) -> None:
         headers=_auth_header("demo", "secret"),
     )
     assert authorized.status_code == 200
+
+
+def test_persisted_state_and_proposal_are_readable_after_memory_clear(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("API_AUTH_ENABLED", "false")
+    monkeypatch.setenv("API_DB_PATH", str(tmp_path / "api_runs.db"))
+    _clear_registry()
+
+    client = TestClient(create_app())
+
+    start = client.post("/api/v1/analyze", json={"sku": "SKU-001", "use_mock": True})
+    assert start.status_code == 200
+    run_id = start.json()["run_id"]
+
+    decision = client.post(
+        f"/api/v1/analyze/{run_id}/decision",
+        json={"decision": "APPROVED"},
+    )
+    assert decision.status_code == 200
+
+    _clear_registry()
+
+    state = client.get(f"/api/v1/analyze/{run_id}")
+    assert state.status_code == 200
+    assert state.json()["status"] == "completed"
+    assert state.json()["approval_status"] == "APPROVED"
+    assert state.json()["paused"] is False
+
+    proposal = client.get(f"/api/v1/analyze/{run_id}/proposal")
+    assert proposal.status_code == 200
+    assert proposal.json()["approval_status"] == "APPROVED"
+    assert proposal.json()["proposal_json"]["approval_status"] == "APPROVED"
+
+
+def test_resume_rejected_when_only_persisted_state_exists(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("API_AUTH_ENABLED", "false")
+    monkeypatch.setenv("API_DB_PATH", str(tmp_path / "api_runs.db"))
+    _clear_registry()
+
+    client = TestClient(create_app())
+
+    start = client.post("/api/v1/analyze", json={"sku": "SKU-001", "use_mock": True})
+    assert start.status_code == 200
+    run_id = start.json()["run_id"]
+
+    _clear_registry()
+
+    response = client.post(
+        f"/api/v1/analyze/{run_id}/decision",
+        json={"decision": "APPROVED"},
+    )
+    assert response.status_code == 409
+    assert "cannot be resumed" in response.json()["detail"]

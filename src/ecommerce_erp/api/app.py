@@ -103,7 +103,13 @@ def create_app() -> FastAPI:
                 detail="Run is not waiting for approval.",
             )
 
-        updated = registry.resume(run_id, payload.decision)
+        try:
+            updated = registry.resume(run_id, payload.decision)
+        except KeyError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Run cannot be resumed from persisted state. Please start a new run.",
+            )
         return _to_run_state_response(run_id, updated)
 
     return app
