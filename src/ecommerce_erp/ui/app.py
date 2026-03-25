@@ -133,6 +133,28 @@ def _inject_sidebar_button_theme() -> None:
     )
 
 
+def _market_call_summary(result: dict[str, Any]) -> tuple[str, str]:
+    """
+    Return (source, status) for the most recent market research call.
+
+    source examples: mock, tavily_live, n/a
+    status examples: success, not_called, error: <message>
+    """
+    market_data = result.get("market_competitor_data")
+    if not market_data:
+        return "n/a", "not_called"
+
+    source = str(market_data.get("source", "unknown"))
+    found = bool(market_data.get("found", False))
+    if found:
+        return source, "success"
+
+    err = str(market_data.get("error", "unknown error"))
+    if len(err) > 120:
+        err = err[:117] + "..."
+    return source, f"error: {err}"
+
+
 def _run_agent(sku: str, use_mock: bool) -> dict[str, Any]:
     os.environ["TAVILY_MOCK"] = "true" if use_mock else "false"
 
@@ -286,6 +308,10 @@ def main() -> None:
             st.metric("Tool Calls This Cycle", result.get("tool_calls_this_cycle", 0))
             st.metric("Goal Satisfied", "Yes" if result.get("goal_satisfied") else "No")
             st.metric("Approval Status", str(result.get("approval_status", "N/A")))
+
+            source, market_status = _market_call_summary(result)
+            st.markdown(f"**Market Source:** {source}")
+            st.markdown(f"**Last Market Call Status:** {market_status}")
 
     with right:
         _render_trace(st.session_state.trace_steps)
