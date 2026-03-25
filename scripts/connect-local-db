@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v psql >/dev/null 2>&1; then
+  echo "psql is not installed. Install PostgreSQL client tools first." >&2
+  exit 1
+fi
+
+DSN="${LOCAL_POSTGRES_DSN:-${API_POSTGRES_DSN:-}}"
+if [[ -z "$DSN" ]]; then
+  echo "Set LOCAL_POSTGRES_DSN (preferred) or API_POSTGRES_DSN before running this script." >&2
+  exit 1
+fi
+
+exec psql "$DSN"

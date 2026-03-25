@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v psql >/dev/null 2>&1; then
+  echo "psql is not installed. Install PostgreSQL client tools first." >&2
+  exit 1
+fi
+
+DSN="${CLOUD_POSTGRES_DSN:-${SUPABASE_POSTGRES_DSN:-}}"
+if [[ -z "$DSN" && "${API_POSTGRES_DSN:-}" == *"supabase.co"* ]]; then
+  DSN="$API_POSTGRES_DSN"
+fi
+
+if [[ -z "$DSN" ]]; then
+  echo "Set CLOUD_POSTGRES_DSN or SUPABASE_POSTGRES_DSN (or API_POSTGRES_DSN pointing at supabase.co)." >&2
+  exit 1
+fi
+
+if [[ "$DSN" != *"sslmode="* ]]; then
+  if [[ "$DSN" == *"?"* ]]; then
+    DSN="${DSN}&sslmode=require"
+  else
+    DSN="${DSN}?sslmode=require"
+  fi
+fi
+
+exec psql "$DSN"

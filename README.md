@@ -238,19 +238,21 @@ curl -s http://localhost:8000/healthz | python -m json.tool
 
 1. Ensure Postgres is running (local install or Docker Desktop container).
 2. Create database (example name: `ecommerce_erp`).
-3. Set `API_DB_BACKEND=postgres`.
-4. Set `API_POSTGRES_DSN` in this format:
+3. Apply the bootstrap SQL in `db/bootstrap/001_phase3_persistence.sql`.
+4. Set `API_DB_BACKEND=postgres`.
+5. Set `API_POSTGRES_DSN` in this format:
    - `postgresql://<user>:<pass>@<host>:<port>/<db_name>`
-5. Decide auth mode:
+6. Decide auth mode:
    - local-only: `API_AUTH_ENABLED=false`
    - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
-6. Start API with `ecommerce-erp-api`.
-7. Verify health: `GET /healthz`.
-8. Verify active backend: `GET /api/v1/config` and confirm:
+7. Start API with `ecommerce-erp-api`.
+8. Verify health: `GET /healthz`.
+9. Verify active backend: `GET /api/v1/config` and confirm:
    - `db_backend` is `postgres`
    - `db_target` shows sanitized host/port/db only (no credentials).
-9. Run one analysis and approve once, then verify audit trail:
-   - `GET /api/v1/analyze/{run_id}/approval-history` returns at least one decision event.
+10. Run one analysis and approve once, then verify audit trail:
+
+- `GET /api/v1/analyze/{run_id}/approval-history` returns at least one decision event.
 
 Example Docker Desktop Postgres quick start:
 
@@ -262,6 +264,34 @@ docker run --name ecommerce-erp-pg \
   -p 5432:5432 \
   -d postgres:16
 ```
+
+Apply the bootstrap SQL locally with `psql`:
+
+```bash
+psql "postgresql://<user>:<pass>@localhost:54322/ecommerce_erp" -f db/bootstrap/001_phase3_persistence.sql
+```
+
+Optional helper scripts for quick CLI connection:
+
+```bash
+# Local Postgres (prefers LOCAL_POSTGRES_DSN, falls back to API_POSTGRES_DSN)
+export LOCAL_POSTGRES_DSN='postgresql://erp_app:<password>@localhost:54322/postgres'
+./scripts/connect-local-db
+
+# Supabase Cloud (prefers CLOUD_POSTGRES_DSN or SUPABASE_POSTGRES_DSN)
+export CLOUD_POSTGRES_DSN='postgresql://erp_app:<password>@<project-ref>.supabase.co:5432/postgres'
+./scripts/connect-cloud-db
+```
+
+`connect-cloud-db` automatically appends `sslmode=require` when missing.
+
+Apply the same SQL to Supabase Cloud:
+
+1. Open the Supabase SQL Editor.
+2. Paste the contents of `db/bootstrap/001_phase3_persistence.sql`.
+3. Run it once in the target project.
+
+This keeps local Docker and Supabase Cloud on the same Phase 3 schema.
 
 ### Quick endpoint list
 
