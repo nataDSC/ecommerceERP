@@ -15,6 +15,8 @@ dependencies = [
     "pydantic>=2.0",
     "python-dotenv>=1.0",
     "streamlit>=1.39",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +27,7 @@ dev = [
 
 [project.scripts]
 ecommerce-erp = "ecommerce_erp.main:main"
+ecommerce-erp-api = "ecommerce_erp.api.app:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
