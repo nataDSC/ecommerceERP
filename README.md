@@ -222,17 +222,17 @@ curl -s http://localhost:8000/healthz | python -m json.tool
 2. Set `API_DB_BACKEND=sqlite`.
 3. Set `API_DB_PATH` to your desired file path (for example `.data/api_runs.db`).
 4. Decide auth mode:
-  - local-only: `API_AUTH_ENABLED=false`
-  - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
+   - local-only: `API_AUTH_ENABLED=false`
+   - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
 5. Start API with `ecommerce-erp-api`.
 6. Verify health: `GET /healthz`.
 7. Verify active backend: `GET /api/v1/config` and confirm:
-  - `db_backend` is `sqlite`
-  - `db_target` matches your SQLite path.
+   - `db_backend` is `sqlite`
+   - `db_target` matches your SQLite path.
 8. Run one analysis and approve once to confirm persistence:
-  - `POST /api/v1/analyze`
-  - `POST /api/v1/analyze/{run_id}/decision`
-  - `GET /api/v1/analyze/{run_id}/approval-history`
+   - `POST /api/v1/analyze`
+   - `POST /api/v1/analyze/{run_id}/decision`
+   - `GET /api/v1/analyze/{run_id}/approval-history`
 
 ### Checklist: Postgres-based instance
 
@@ -240,17 +240,17 @@ curl -s http://localhost:8000/healthz | python -m json.tool
 2. Create database (example name: `ecommerce_erp`).
 3. Set `API_DB_BACKEND=postgres`.
 4. Set `API_POSTGRES_DSN` in this format:
-  - `postgresql://<user>:<pass>@<host>:<port>/<db_name>`
+   - `postgresql://<user>:<pass>@<host>:<port>/<db_name>`
 5. Decide auth mode:
-  - local-only: `API_AUTH_ENABLED=false`
-  - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
+   - local-only: `API_AUTH_ENABLED=false`
+   - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
 6. Start API with `ecommerce-erp-api`.
 7. Verify health: `GET /healthz`.
 8. Verify active backend: `GET /api/v1/config` and confirm:
-  - `db_backend` is `postgres`
-  - `db_target` shows sanitized host/port/db only (no credentials).
+   - `db_backend` is `postgres`
+   - `db_target` shows sanitized host/port/db only (no credentials).
 9. Run one analysis and approve once, then verify audit trail:
-  - `GET /api/v1/analyze/{run_id}/approval-history` returns at least one decision event.
+   - `GET /api/v1/analyze/{run_id}/approval-history` returns at least one decision event.
 
 Example Docker Desktop Postgres quick start:
 
