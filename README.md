@@ -216,6 +216,53 @@ Optional quick check in either profile:
 curl -s http://localhost:8000/healthz | python -m json.tool
 ```
 
+### Checklist: SQLite-based instance
+
+1. Activate environment and install dependencies.
+2. Set `API_DB_BACKEND=sqlite`.
+3. Set `API_DB_PATH` to your desired file path (for example `.data/api_runs.db`).
+4. Decide auth mode:
+  - local-only: `API_AUTH_ENABLED=false`
+  - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
+5. Start API with `ecommerce-erp-api`.
+6. Verify health: `GET /healthz`.
+7. Verify active backend: `GET /api/v1/config` and confirm:
+  - `db_backend` is `sqlite`
+  - `db_target` matches your SQLite path.
+8. Run one analysis and approve once to confirm persistence:
+  - `POST /api/v1/analyze`
+  - `POST /api/v1/analyze/{run_id}/decision`
+  - `GET /api/v1/analyze/{run_id}/approval-history`
+
+### Checklist: Postgres-based instance
+
+1. Ensure Postgres is running (local install or Docker Desktop container).
+2. Create database (example name: `ecommerce_erp`).
+3. Set `API_DB_BACKEND=postgres`.
+4. Set `API_POSTGRES_DSN` in this format:
+  - `postgresql://<user>:<pass>@<host>:<port>/<db_name>`
+5. Decide auth mode:
+  - local-only: `API_AUTH_ENABLED=false`
+  - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
+6. Start API with `ecommerce-erp-api`.
+7. Verify health: `GET /healthz`.
+8. Verify active backend: `GET /api/v1/config` and confirm:
+  - `db_backend` is `postgres`
+  - `db_target` shows sanitized host/port/db only (no credentials).
+9. Run one analysis and approve once, then verify audit trail:
+  - `GET /api/v1/analyze/{run_id}/approval-history` returns at least one decision event.
+
+Example Docker Desktop Postgres quick start:
+
+```bash
+docker run --name ecommerce-erp-pg \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=ecommerce_erp \
+  -p 5432:5432 \
+  -d postgres:16
+```
+
 ### Quick endpoint list
 
 - `GET /healthz`
@@ -323,20 +370,20 @@ no live API calls are ever made during `pytest`.
 
 ## Environment variables
 
-| Variable                   | Default  | Description                                              |
-| -------------------------- | -------- | -------------------------------------------------------- |
-| `TAVILY_API_KEY`           | —        | Required for live market research. Get one at tavily.com |
-| `TAVILY_MOCK`              | `false`  | Set `true` for fully offline mock mode                   |
-| `MAX_TOOL_CALLS_PER_CYCLE` | `5`      | Cost-guard cap — halts the loop if exceeded              |
-| `LOG_DIR`                  | `./logs` | Directory where `reasoning_trace.log` is written         |
-| `API_HOST`                 | `0.0.0.0`| FastAPI bind host                                         |
-| `API_PORT`                 | `8000`   | FastAPI bind port                                         |
-| `API_AUTH_ENABLED`         | `false`  | Enable HTTP basic auth on API routes                      |
-| `API_BASIC_AUTH_USER`      | `admin`  | Username for API basic auth                               |
-| `API_BASIC_AUTH_PASS`      | `change_me` | Password for API basic auth                            |
-| `API_DB_BACKEND`           | `sqlite` | Persistence backend: `sqlite` or `postgres`              |
-| `API_DB_PATH`              | `.data/api_runs.db` | SQLite DB file path when backend is `sqlite`    |
-| `API_POSTGRES_DSN`         | —        | Postgres DSN when backend is `postgres`                  |
+| Variable                   | Default             | Description                                              |
+| -------------------------- | ------------------- | -------------------------------------------------------- |
+| `TAVILY_API_KEY`           | —                   | Required for live market research. Get one at tavily.com |
+| `TAVILY_MOCK`              | `false`             | Set `true` for fully offline mock mode                   |
+| `MAX_TOOL_CALLS_PER_CYCLE` | `5`                 | Cost-guard cap — halts the loop if exceeded              |
+| `LOG_DIR`                  | `./logs`            | Directory where `reasoning_trace.log` is written         |
+| `API_HOST`                 | `0.0.0.0`           | FastAPI bind host                                        |
+| `API_PORT`                 | `8000`              | FastAPI bind port                                        |
+| `API_AUTH_ENABLED`         | `false`             | Enable HTTP basic auth on API routes                     |
+| `API_BASIC_AUTH_USER`      | `admin`             | Username for API basic auth                              |
+| `API_BASIC_AUTH_PASS`      | `change_me`         | Password for API basic auth                              |
+| `API_DB_BACKEND`           | `sqlite`            | Persistence backend: `sqlite` or `postgres`              |
+| `API_DB_PATH`              | `.data/api_runs.db` | SQLite DB file path when backend is `sqlite`             |
+| `API_POSTGRES_DSN`         | —                   | Postgres DSN when backend is `postgres`                  |
 
 ---
 
