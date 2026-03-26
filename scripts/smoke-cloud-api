@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required but not installed." >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required but not installed." >&2
+  exit 1
+fi
+
+BASE_URL="${API_BASE_URL:-http://localhost:8000}"
+AUTH_ARGS=()
+if [[ -n "${API_BASIC_AUTH_USER:-}" || -n "${API_BASIC_AUTH_PASS:-}" ]]; then
+  if [[ -z "${API_BASIC_AUTH_USER:-}" || -z "${API_BASIC_AUTH_PASS:-}" ]]; then
+    echo "Set both API_BASIC_AUTH_USER and API_BASIC_AUTH_PASS, or neither." >&2
+    exit 1
+  fi
+  AUTH_ARGS=(-u "${API_BASIC_AUTH_USER}:${API_BASIC_AUTH_PASS}")
+fi
+
+echo "[1/5] health check"
+curl -sf "${BASE_URL}/healthz" "${AUTH_ARGS[@]}" >/tmp/ecommerce_erp_health.json
+
+echo "[2/5] config check"
+curl -sf "${BASE_URL}/api/v1/config" "${AUTH_ARGS[@]}" >/tmp/ecommerce_erp_config.json
+BACKEND="$(python3 - <<'PY'
+import json
+from pathlib import Path
+data = json.loads(Path('/tmp/ecommerce_erp_config.json').read_text())
+print(data.get('db_backend', ''))
+PY
+)"
+
+if [[ "${BACKEND}" != "postgres" ]]; then
+  echo "Expected db_backend=postgres, got '${BACKEND}'." >&2
+  exit 1
+fi
+
+echo "[3/5] create run"
+RUN_PAYLOAD='{"sku":"SKU-001","use_mock":true}'
+curl -sf "${BASE_URL}/api/v1/analyze" "${AUTH_ARGS[@]}" \
+  -H 'Content-Type: application/json' \
+  -d "${RUN_PAYLOAD}" >/tmp/ecommerce_erp_start.json
+
+RUN_ID="$(python3 - <<'PY'
+import json
+from pathlib import Path
+data = json.loads(Path('/tmp/ecommerce_erp_start.json').read_text())
+print(data.get('run_id', ''))
+PY
+)"
+
+if [[ -z "${RUN_ID}" ]]; then
+  echo "Run creation failed: run_id missing." >&2
+  cat /tmp/ecommerce_erp_start.json >&2
+  exit 1
+fi
+
+echo "[4/5] approve run ${RUN_ID}"
+curl -sf "${BASE_URL}/api/v1/analyze/${RUN_ID}/decision" "${AUTH_ARGS[@]}" \
+  -H 'Content-Type: application/json' \
+  -d '{"decision":"APPROVED"}' >/tmp/ecommerce_erp_decision.json
+
+echo "[5/5] approval-history"
+curl -sf "${BASE_URL}/api/v1/analyze/${RUN_ID}/approval-history" "${AUTH_ARGS[@]}" \
+  >/tmp/ecommerce_erp_history.json
+
+EVENTS_COUNT="$(python3 - <<'PY'
+import json
+from pathlib import Path
+data = json.loads(Path('/tmp/ecommerce_erp_history.json').read_text())
+print(len(data.get('events', [])))
+PY
+)"
+
+if [[ "${EVENTS_COUNT}" -lt 1 ]]; then
+  echo "Smoke test failed: approval-history has no events." >&2
+  cat /tmp/ecommerce_erp_history.json >&2
+  exit 1
+fi
+
+echo "Smoke test passed. run_id=${RUN_ID}, approval_events=${EVENTS_COUNT}"

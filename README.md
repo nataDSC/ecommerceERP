@@ -242,15 +242,18 @@ curl -s http://localhost:8000/healthz | python -m json.tool
 4. Set `API_DB_BACKEND=postgres`.
 5. Set `API_POSTGRES_DSN` in this format:
    - `postgresql://<user>:<pass>@<host>:<port>/<db_name>`
-6. Decide auth mode:
+6. Ensure the schema already exists before starting the API.
+7. Decide auth mode:
    - local-only: `API_AUTH_ENABLED=false`
    - shared env: `API_AUTH_ENABLED=true` and set `API_BASIC_AUTH_USER` / `API_BASIC_AUTH_PASS`
-7. Start API with `ecommerce-erp-api`.
-8. Verify health: `GET /healthz`.
-9. Verify active backend: `GET /api/v1/config` and confirm:
-   - `db_backend` is `postgres`
-   - `db_target` shows sanitized host/port/db only (no credentials).
-10. Run one analysis and approve once, then verify audit trail:
+8. Start API with `ecommerce-erp-api`.
+9. Verify health: `GET /healthz`.
+10. Verify active backend: `GET /api/v1/config` and confirm:
+
+- `db_backend` is `postgres`
+- `db_target` shows sanitized host/port/db only (no credentials).
+
+11. Run one analysis and approve once, then verify audit trail:
 
 - `GET /api/v1/analyze/{run_id}/approval-history` returns at least one decision event.
 
@@ -271,6 +274,19 @@ Apply the bootstrap SQL locally with `psql`:
 psql "postgresql://<user>:<pass>@localhost:54322/ecommerce_erp" -f db/bootstrap/001_phase3_persistence.sql
 ```
 
+Optional ownership transfer for least-privilege app role (`erp_app`):
+
+```bash
+# Run as a sufficiently privileged role (for example postgres)
+psql "postgresql://<admin_user>:<admin_pass>@<host>:<port>/<db_name>" \
+  -f db/bootstrap/002_transfer_ownership_to_erp_app.sql
+```
+
+This migration only touches ecommerceERP persistence objects:
+`runs`, `approval_events`, and `approval_events_id_seq`.
+Use it for local or self-managed Postgres. For Supabase Cloud, keep ownership as-is
+and grant runtime privileges instead.
+
 Optional helper scripts for quick CLI connection:
 
 ```bash
@@ -284,6 +300,21 @@ export CLOUD_POSTGRES_DSN='postgresql://erp_app:<password>@<project-ref>.supabas
 ```
 
 `connect-cloud-db` automatically appends `sslmode=require` when missing.
+
+Cloud API smoke test helper:
+
+```bash
+# Assumes ecommerce-erp-api is running locally against Supabase Cloud Postgres
+./scripts/smoke-cloud-api
+
+# If API auth is enabled
+export API_BASIC_AUTH_USER='<api_user>'
+export API_BASIC_AUTH_PASS='<api_pass>'
+./scripts/smoke-cloud-api
+```
+
+The smoke test validates: `/healthz`, `/api/v1/config` (`db_backend=postgres`),
+run creation, approval decision, and approval-history.
 
 Apply the same SQL to Supabase Cloud:
 

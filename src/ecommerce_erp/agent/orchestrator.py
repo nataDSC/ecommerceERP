@@ -326,7 +326,29 @@ def approval_node(state: AgentState) -> dict[str, Any]:
     if isinstance(recommendation, dict):
         json_block = dict(recommendation.get("json", {}))
         json_block["approval_status"] = normalized
-        updated_recommendation = {**recommendation, "json": json_block}
+        markdown_block = recommendation.get("markdown")
+        if isinstance(markdown_block, str):
+            updated_markdown = markdown_block.replace(
+                "| **Approval Status** | PENDING_APPROVAL |",
+                f"| **Approval Status** | {normalized} |",
+            )
+            if normalized == ApprovalStatus.APPROVED.value:
+                updated_markdown = updated_markdown.replace(
+                    "\n> ⚠️ **ACTION REQUIRED: Awaiting Human Approval.**  This proposal must be reviewed and approved before any purchase order is placed.",
+                    "\n> ✅ **APPROVED:** Human review completed. This proposal is approved.",
+                )
+            else:
+                updated_markdown = updated_markdown.replace(
+                    "\n> ⚠️ **ACTION REQUIRED: Awaiting Human Approval.**  This proposal must be reviewed and approved before any purchase order is placed.",
+                    "\n> ❌ **REJECTED:** Human review rejected this proposal. No purchase order should be placed.",
+                )
+            updated_recommendation = {
+                **recommendation,
+                "json": json_block,
+                "markdown": updated_markdown,
+            }
+        else:
+            updated_recommendation = {**recommendation, "json": json_block}
 
     return {
         "approval_status": normalized,

@@ -87,6 +87,8 @@ def test_analyze_and_approval_flow(monkeypatch) -> None:
     assert proposal.status_code == 200
     assert proposal.json()["approval_status"] == "APPROVED"
     assert proposal.json()["proposal_json"]["approval_status"] == "APPROVED"
+    assert "| **Approval Status** | APPROVED |" in proposal.json()["proposal_markdown"]
+    assert "ACTION REQUIRED: Awaiting Human Approval" not in proposal.json()["proposal_markdown"]
 
 
 def test_auth_required_rejects_missing_credentials(monkeypatch) -> None:

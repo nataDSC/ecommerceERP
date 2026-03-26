@@ -254,43 +254,7 @@ class PostgresRunPersistence:
                 "Postgres backend requires 'psycopg'. Install project dependencies first."
             ) from exc
 
-        conn = psycopg.connect(self._dsn(), row_factory=dict_row)
-        self._ensure_schema(conn)
-        return conn
-
-    @staticmethod
-    def _ensure_schema(conn) -> None:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS runs (
-                    run_id TEXT PRIMARY KEY,
-                    sku TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    approval_status TEXT,
-                    paused BOOLEAN NOT NULL,
-                    error TEXT,
-                    tool_calls_this_cycle INTEGER NOT NULL DEFAULT 0,
-                    reasoning_steps_count INTEGER NOT NULL DEFAULT 0,
-                    final_recommendation_json JSONB,
-                    final_recommendation_markdown TEXT,
-                    created_at TIMESTAMPTZ NOT NULL,
-                    updated_at TIMESTAMPTZ NOT NULL
-                )
-                """
-            )
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS approval_events (
-                    id BIGSERIAL PRIMARY KEY,
-                    run_id TEXT NOT NULL REFERENCES runs(run_id),
-                    decision TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    created_at TIMESTAMPTZ NOT NULL
-                )
-                """
-            )
-        conn.commit()
+        return psycopg.connect(self._dsn(), row_factory=dict_row)
 
     @staticmethod
     def _now() -> str:
