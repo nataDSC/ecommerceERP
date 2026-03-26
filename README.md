@@ -381,20 +381,45 @@ For Postgres backend, `db_target` is intentionally sanitized and excludes user/p
 
 ### Phase 4: Dockerization
 
-- Add production Dockerfile(s) and docker-compose.
-- Add health checks, env-based config, non-root runtime user.
+- Completed: production multi-stage Dockerfile with non-root runtime user.
+- Completed: docker-compose profiles for SQLite, Postgres, and Streamlit.
+- Completed: container health checks and env-based runtime configuration.
+- Completed: CI workflow for Docker build + SQLite smoke + Postgres compose smoke.
 
 ### Phase 5: Enterprise deployment (AWS-first)
 
-- Preferred path for popularity and speed:
-  - Containers on ECS Fargate or App Runner.
-  - ALB + ACM + Route53 for HTTPS and DNS.
-  - Secrets Manager for API keys.
-  - CloudWatch for logs/metrics/alarms.
+Goal: production-grade, secure, observable deployment on AWS with staged rollout.
 
-- Azure remains a strong option when your stack is Microsoft-first or needs
-  tighter Entra ID integration, but AWS is the practical default for broad
-  ecosystem familiarity.
+- Slice 5.1: Platform and networking foundation
+  - Choose runtime target: ECS Fargate (recommended default) or App Runner.
+  - Provision VPC, public/private subnets, NAT, security groups.
+  - Provision ECR repository for image storage.
+  - Define IaC baseline (Terraform or CloudFormation) for repeatable environments.
+
+- Slice 5.2: Data and secrets hardening
+  - Use managed Postgres target (Amazon RDS PostgreSQL) or approved external Postgres.
+  - Move runtime secrets to AWS Secrets Manager (DB DSN, API auth credentials, Tavily key).
+  - Use least-privilege IAM roles for task execution and application access.
+
+- Slice 5.3: Service deployment
+  - Build and push versioned image tags to ECR.
+  - Deploy API service on ECS Fargate behind an Application Load Balancer.
+  - Add health checks, autoscaling policy, and rolling deployment configuration.
+
+- Slice 5.4: Edge and security controls
+  - Configure HTTPS with ACM certificates and Route53 DNS records.
+  - Add AWS WAF baseline protections at the ALB layer.
+  - Restrict inbound access by CIDR/rules as needed for internal endpoints.
+
+- Slice 5.5: Observability and operations
+  - Send container logs to CloudWatch Logs with retention policies.
+  - Add CloudWatch alarms (5xx rate, latency, task restarts, health-check failures).
+  - Create runbook for rollback, secret rotation, and incident triage.
+
+- Slice 5.6: Delivery workflow and promotion
+  - Extend CI/CD to publish images and deploy to dev, then stage, then prod.
+  - Add smoke tests post-deploy against health and core API workflow endpoints.
+  - Use environment-based approvals for production promotion.
 
 ---
 
@@ -584,6 +609,49 @@ docker rm -f ecommerce-erp-api-local-smoke
 ```
 
 The smoke script validates: `/healthz`, `/api/v1/config`, run creation, approval decision, and approval-history persistence.
+
+---
+
+## AWS Platform Foundation (Phase 5 Slice 5.1)
+
+Slice 5.1 provisions the AWS infrastructure that all later slices depend on:
+
+| Resource                            | Scope                                |
+| ----------------------------------- | ------------------------------------ |
+| ECR repository (`ecommerce-erp`)    | image registry with scan-on-push     |
+| VPC (`ecommerce-erp-vpc-<env>`)     | 2 AZs, public + private subnets, NAT |
+| ECS cluster (`ecommerce-erp-<env>`) | Fargate + FARGATE_SPOT capacity      |
+| Terraform remote state              | S3 bucket + DynamoDB lock table      |
+
+### IaC layout
+
+```
+infra/terraform/
+  modules/ecr/          # ECR repo + lifecycle policy
+  modules/vpc/          # VPC, subnets, NAT, routing
+  modules/ecs-cluster/  # ECS cluster + Container Insights
+  environments/dev/     # root module for dev (staging + prod follow same pattern)
+```
+
+Full step-by-step implementation checklist, naming conventions, and verification commands are in:
+
+- [`docs/phase5-slice5.1-checklist.md`](docs/phase5-slice5.1-checklist.md)
+
+### Quick-start (after Terraform apply)
+
+```bash
+# Authenticate Docker to ECR
+aws ecr get-login-password --region us-east-1 \
+  | docker login --username AWS --password-stdin \
+    "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
+
+# Push the image built in Phase 4
+GIT_SHA=$(git rev-parse --short HEAD)
+ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/ecommerce-erp"
+docker tag ecommerce-erp-api:local "${ECR_REPO}:${GIT_SHA}"
+docker push "${ECR_REPO}:${GIT_SHA}"
+docker push "${ECR_REPO}:latest"
+```
 
 ---
 

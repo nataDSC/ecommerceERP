@@ -10,3 +10,11 @@ venv/
 htmlcov/
 logs/
 reasoning_trace.log
+
+# Terraform
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate
+infra/terraform/**/*.tfstate.backup
+infra/terraform/**/*.tfvars
+infra/terraform/**/.terraform.lock.hcl
+.envrc
