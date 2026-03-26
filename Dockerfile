@@ -35,6 +35,8 @@ RUN addgroup --system appgroup \
     && chown -R appuser:appgroup /app
 
 COPY --from=builder /opt/venv /opt/venv
+COPY src ./src
+COPY streamlit_app.py ./streamlit_app.py
 
 USER appuser
 

@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl is required but not installed." >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required but not installed." >&2
+  exit 1
+fi
+
+BASE_URL="${API_BASE_URL:-http://localhost:8000}"
+EXPECTED_BACKEND="${API_EXPECTED_BACKEND:-sqlite}"
+AUTH_ARGS=()
+if [[ -n "${API_BASIC_AUTH_USER:-}" || -n "${API_BASIC_AUTH_PASS:-}" ]]; then
+  if [[ -z "${API_BASIC_AUTH_USER:-}" || -z "${API_BASIC_AUTH_PASS:-}" ]]; then
+    echo "Set both API_BASIC_AUTH_USER and API_BASIC_AUTH_PASS, or neither." >&2
+    exit 1
+  fi
+  AUTH_ARGS=(-u "${API_BASIC_AUTH_USER}:${API_BASIC_AUTH_PASS}")
+fi
+
+curl_json() {
+  local url="$1"
+  local output_path="$2"
+  if [[ ${#AUTH_ARGS[@]} -gt 0 ]]; then
+    curl -sf "${url}" "${AUTH_ARGS[@]}" >"${output_path}"
+  else
+    curl -sf "${url}" >"${output_path}"
+  fi
+}
+
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "${TMPDIR}"' EXIT
+
+HEALTH_JSON="${TMPDIR}/health.json"
+CONFIG_JSON="${TMPDIR}/config.json"
+START_JSON="${TMPDIR}/start.json"
+DECISION_JSON="${TMPDIR}/decision.json"
+HISTORY_JSON="${TMPDIR}/history.json"
+
+
+echo "[1/5] health check"
+curl_json "${BASE_URL}/healthz" "${HEALTH_JSON}"
+
+
+echo "[2/5] config check"
+curl_json "${BASE_URL}/api/v1/config" "${CONFIG_JSON}"
+BACKEND="$(python3 - "${CONFIG_JSON}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text())
+print(data.get("db_backend", ""))
+PY
+)"
+
+if [[ "${BACKEND}" != "${EXPECTED_BACKEND}" ]]; then
+  echo "Expected db_backend=${EXPECTED_BACKEND}, got '${BACKEND}'." >&2
+  exit 1
+fi
+
+
+echo "[3/5] create run"
+RUN_PAYLOAD='{"sku":"SKU-001","use_mock":true}'
+if [[ ${#AUTH_ARGS[@]} -gt 0 ]]; then
+  curl -sf "${BASE_URL}/api/v1/analyze" "${AUTH_ARGS[@]}" \
+    -H 'Content-Type: application/json' \
+    -d "${RUN_PAYLOAD}" >"${START_JSON}"
+else
+  curl -sf "${BASE_URL}/api/v1/analyze" \
+    -H 'Content-Type: application/json' \
+    -d "${RUN_PAYLOAD}" >"${START_JSON}"
+fi
+
+RUN_ID="$(python3 - "${START_JSON}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text())
+print(data.get("run_id", ""))
+PY
+)"
+
+if [[ -z "${RUN_ID}" ]]; then
+  echo "Run creation failed: run_id missing." >&2
+  cat "${START_JSON}" >&2
+  exit 1
+fi
+
+
+echo "[4/5] approve run ${RUN_ID}"
+if [[ ${#AUTH_ARGS[@]} -gt 0 ]]; then
+  curl -sf "${BASE_URL}/api/v1/analyze/${RUN_ID}/decision" "${AUTH_ARGS[@]}" \
+    -H 'Content-Type: application/json' \
+    -d '{"decision":"APPROVED"}' >"${DECISION_JSON}"
+else
+  curl -sf "${BASE_URL}/api/v1/analyze/${RUN_ID}/decision" \
+    -H 'Content-Type: application/json' \
+    -d '{"decision":"APPROVED"}' >"${DECISION_JSON}"
+fi
+
+
+echo "[5/5] approval-history"
+curl_json "${BASE_URL}/api/v1/analyze/${RUN_ID}/approval-history" "${HISTORY_JSON}"
+
+EVENTS_COUNT="$(python3 - "${HISTORY_JSON}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+data = json.loads(Path(sys.argv[1]).read_text())
+print(len(data.get("events", [])))
+PY
+)"
+
+if [[ "${EVENTS_COUNT}" -lt 1 ]]; then
+  echo "Smoke test failed: approval-history has no events." >&2
+  cat "${HISTORY_JSON}" >&2
+  exit 1
+fi
+
+echo "Smoke test passed. run_id=${RUN_ID}, approval_events=${EVENTS_COUNT}, backend=${BACKEND}"

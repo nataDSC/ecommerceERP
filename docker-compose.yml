@@ -1,0 +1,110 @@
+name: ecommerce-erp
+
+x-api-environment: &api-environment
+  API_AUTH_ENABLED: ${API_AUTH_ENABLED:-false}
+  API_BASIC_AUTH_USER: ${API_BASIC_AUTH_USER:-admin}
+  API_BASIC_AUTH_PASS: ${API_BASIC_AUTH_PASS:-change_me}
+  API_HOST: 0.0.0.0
+  API_PORT: 8000
+  LOG_DIR: /app/logs
+  MAX_TOOL_CALLS_PER_CYCLE: ${MAX_TOOL_CALLS_PER_CYCLE:-5}
+  TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+  TAVILY_MOCK: ${TAVILY_MOCK:-true}
+
+x-api-service: &api-service
+  build:
+    context: .
+  image: ecommerce-erp-api:local
+  restart: unless-stopped
+  environment:
+    <<: *api-environment
+  volumes:
+    - api_logs:/app/logs
+
+services:
+  api-sqlite:
+    <<: *api-service
+    profiles: ["sqlite"]
+    ports:
+      - "${API_SQLITE_PORT:-8000}:8000"
+    environment:
+      <<: *api-environment
+      API_DB_BACKEND: sqlite
+      API_DB_PATH: /app/.data/api_runs.db
+    volumes:
+      - sqlite_data:/app/.data
+      - api_logs:/app/logs
+
+  postgres:
+    image: postgres:16
+    profiles: ["postgres"]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/bootstrap/001_phase3_persistence.sql:/docker-entrypoint-initdb.d/001_phase3_persistence.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api-postgres:
+    <<: *api-service
+    profiles: ["postgres"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${API_POSTGRES_PORT:-8000}:8000"
+    environment:
+      <<: *api-environment
+      API_DB_BACKEND: postgres
+      API_POSTGRES_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ecommerce_erp}
+
+  streamlit:
+    build:
+      context: .
+    image: ecommerce-erp-api:local
+    profiles: ["streamlit"]
+    restart: unless-stopped
+    command:
+      - python
+      - -m
+      - streamlit
+      - run
+      - streamlit_app.py
+      - --server.address=0.0.0.0
+      - --server.port=8501
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    environment:
+      LOG_DIR: /app/logs
+      MAX_TOOL_CALLS_PER_CYCLE: ${MAX_TOOL_CALLS_PER_CYCLE:-5}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      TAVILY_MOCK: ${TAVILY_MOCK:-true}
+    volumes:
+      - api_logs:/app/logs
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; response = urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3); assert response.status == 200",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  api_logs:
+  postgres_data:
+  sqlite_data:

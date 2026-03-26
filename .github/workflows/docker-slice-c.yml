@@ -1,0 +1,110 @@
+name: Docker Slice C
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-compose.yml
+      - pyproject.toml
+      - src/**
+      - scripts/smoke-api
+      - .github/workflows/docker-slice-c.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - docker-compose.yml
+      - pyproject.toml
+      - src/**
+      - scripts/smoke-api
+      - .github/workflows/docker-slice-c.yml
+
+jobs:
+  docker-build-and-smoke-sqlite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t ecommerce-erp-api:ci .
+
+      - name: Start container (SQLite)
+        run: |
+          docker run -d --name ecommerce-erp-api-ci \
+            -p 18000:8000 \
+            -e API_DB_BACKEND=sqlite \
+            -e API_DB_PATH=/app/.data/api_runs.db \
+            -e API_AUTH_ENABLED=false \
+            -e TAVILY_MOCK=true \
+            ecommerce-erp-api:ci
+
+      - name: Wait for health
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:18000/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Container did not become healthy in time" >&2
+          docker logs ecommerce-erp-api-ci || true
+          exit 1
+
+      - name: Run API smoke test
+        run: |
+          chmod +x scripts/smoke-api
+          API_BASE_URL=http://127.0.0.1:18000 \
+          API_EXPECTED_BACKEND=sqlite \
+          ./scripts/smoke-api
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker logs ecommerce-erp-api-ci || true
+
+      - name: Stop container
+        if: always()
+        run: docker rm -f ecommerce-erp-api-ci || true
+
+  docker-compose-postgres-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start compose Postgres profile
+        run: |
+          docker compose --profile postgres up --build -d postgres api-postgres
+
+      - name: Wait for API health
+        run: |
+          for i in {1..45}; do
+            if curl -fsS http://127.0.0.1:8000/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Compose API did not become healthy in time" >&2
+          docker compose --profile postgres logs postgres api-postgres || true
+          exit 1
+
+      - name: Run API smoke test (Postgres)
+        run: |
+          chmod +x scripts/smoke-api
+          API_BASE_URL=http://127.0.0.1:8000 \
+          API_EXPECTED_BACKEND=postgres \
+          ./scripts/smoke-api
+
+      - name: Show compose logs on failure
+        if: failure()
+        run: docker compose --profile postgres logs postgres api-postgres || true
+
+      - name: Stop compose stack
+        if: always()
+        run: docker compose --profile postgres down -v

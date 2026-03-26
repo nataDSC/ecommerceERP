@@ -485,6 +485,106 @@ Notes:
 - For SQLite mode, persist `/app/.data` with a named volume or bind mount.
 - Secrets stay in environment variables; do not bake them into the image.
 
+## Docker Compose (Phase 4 Slice B)
+
+Phase 4 Slice B adds a local multi-service workflow in `docker-compose.yml` with:
+
+- `api-sqlite` for API + SQLite persistence,
+- `postgres` + `api-postgres` for API + local Postgres bootstrap,
+- `streamlit` for the Streamlit demo.
+
+### SQLite profile
+
+```bash
+docker compose up --build api-sqlite
+```
+
+Defaults:
+
+- API at `http://localhost:8000`
+- SQLite data persisted in the named volume `sqlite_data`
+- logs persisted in the named volume `api_logs`
+
+### Postgres profile
+
+```bash
+docker compose --profile postgres up --build api-postgres postgres
+```
+
+Defaults:
+
+- API at `http://localhost:8000`
+- Postgres at `localhost:5432`
+- database/user/password default to `ecommerce_erp` / `postgres` / `postgres`
+- bootstrap SQL from `db/bootstrap/001_phase3_persistence.sql` runs automatically on first init
+
+Optional overrides:
+
+```bash
+POSTGRES_DB=mydb POSTGRES_USER=myuser POSTGRES_PASSWORD=mypassword \
+API_POSTGRES_PORT=8001 POSTGRES_PORT=5433 \
+docker compose --profile postgres up --build api-postgres postgres
+```
+
+If you reuse an existing `postgres_data` volume, the bootstrap SQL will not re-run. In that case either apply the SQL manually or recreate the volume.
+
+### Streamlit profile
+
+```bash
+docker compose --profile streamlit up --build streamlit
+```
+
+Defaults:
+
+- Streamlit at `http://localhost:8501`
+- health endpoint at `http://localhost:8501/_stcore/health`
+
+### Shutdown and cleanup
+
+```bash
+docker compose down
+docker compose down -v
+```
+
+Use `down -v` only when you want to remove the named SQLite/Postgres volumes.
+
+## Docker CI (Phase 4 Slice C)
+
+Slice C adds a GitHub Actions workflow that:
+
+- runs a direct Docker smoke lane for SQLite,
+- runs a Docker Compose smoke lane for Postgres,
+- waits for `/healthz` before each smoke test,
+- captures container/compose logs on failure.
+
+Workflow file:
+
+- `.github/workflows/docker-slice-c.yml`
+
+Smoke test script used by CI:
+
+- `scripts/smoke-api`
+
+### Run the Slice C smoke test locally
+
+```bash
+docker build -t ecommerce-erp-api:local .
+
+docker run -d --name ecommerce-erp-api-local-smoke \
+  -p 18000:8000 \
+  -e API_DB_BACKEND=sqlite \
+  -e API_DB_PATH=/app/.data/api_runs.db \
+  -e API_AUTH_ENABLED=false \
+  -e TAVILY_MOCK=true \
+  ecommerce-erp-api:local
+
+API_BASE_URL=http://127.0.0.1:18000 API_EXPECTED_BACKEND=sqlite ./scripts/smoke-api
+
+docker rm -f ecommerce-erp-api-local-smoke
+```
+
+The smoke script validates: `/healthz`, `/api/v1/config`, run creation, approval decision, and approval-history persistence.
+
 ---
 
 ## Environment variables
