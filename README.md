@@ -429,6 +429,64 @@ no live API calls are ever made during `pytest`.
 
 ---
 
+## Dockerization (Phase 4 Slice A)
+
+Phase 4 now includes a production-oriented API image with:
+
+- multi-stage build,
+- non-root runtime user,
+- env-driven configuration,
+- container health check against `/healthz`.
+
+### Build the API image
+
+```bash
+docker build -t ecommerce-erp-api:local .
+```
+
+### Run with SQLite
+
+```bash
+docker run --rm \
+  -p 8000:8000 \
+  -e API_DB_BACKEND=sqlite \
+  -e API_DB_PATH=/app/.data/api_runs.db \
+  -e API_AUTH_ENABLED=false \
+  -e TAVILY_MOCK=true \
+  -v ecommerce_erp_sqlite:/app/.data \
+  ecommerce-erp-api:local
+```
+
+### Run with Postgres
+
+Apply `db/bootstrap/001_phase3_persistence.sql` first, then start the container:
+
+```bash
+docker run --rm \
+  -p 8000:8000 \
+  -e API_DB_BACKEND=postgres \
+  -e API_POSTGRES_DSN='postgresql://<user>:<pass>@<host>:<port>/<db_name>?sslmode=require' \
+  -e API_AUTH_ENABLED=false \
+  -e TAVILY_MOCK=true \
+  ecommerce-erp-api:local
+```
+
+### Container health
+
+```bash
+docker ps
+docker inspect --format='{{json .State.Health}}' <container_name> | python -m json.tool
+curl -s http://localhost:8000/healthz | python -m json.tool
+```
+
+Notes:
+
+- The container does not create Postgres tables at runtime.
+- For SQLite mode, persist `/app/.data` with a named volume or bind mount.
+- Secrets stay in environment variables; do not bake them into the image.
+
+---
+
 ## Environment variables
 
 | Variable                   | Default             | Description                                              |
