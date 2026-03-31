@@ -42,7 +42,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ecommerce_erp}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?err}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -66,7 +66,7 @@ services:
     environment:
       <<: *api-environment
       API_DB_BACKEND: postgres
-      API_POSTGRES_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-ecommerce_erp}
+      API_POSTGRES_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?err}@postgres:5432/${POSTGRES_DB:-ecommerce_erp}
 
   streamlit:
     build:
