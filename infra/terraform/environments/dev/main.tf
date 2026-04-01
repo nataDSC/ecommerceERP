@@ -24,6 +24,8 @@ module "vpc" {
   source      = "../../modules/vpc"
   environment = "dev"
   aws_region  = var.aws_region
+  enable_nat_gateway = var.enable_nat_gateway
+  single_nat_gateway = var.single_nat_gateway
 }
 
 module "ecr" {
