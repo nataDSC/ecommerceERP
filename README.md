@@ -627,10 +627,12 @@ Slice 5.1 provisions the AWS infrastructure that all later slices depend on:
 
 ```
 infra/terraform/
-  modules/ecr/          # ECR repo + lifecycle policy
-  modules/vpc/          # VPC, subnets, NAT, routing
-  modules/ecs-cluster/  # ECS cluster + Container Insights
-  environments/dev/     # root module for dev (staging + prod follow same pattern)
+  modules/ecr/           # ECR repo + lifecycle policy
+  modules/vpc/           # VPC, subnets, NAT, VPC endpoints
+  modules/ecs-cluster/   # ECS cluster + Container Insights
+  modules/rds-postgres/  # cost-conscious RDS PostgreSQL + DB secret
+  modules/app-runtime/   # app runtime secret + ECS IAM roles + app SG
+  environments/dev/      # root module for dev (staging + prod follow same pattern)
 ```
 
 Full step-by-step implementation checklist, naming conventions, and verification commands are in:
@@ -660,6 +662,60 @@ docker tag ecommerce-erp-api:local "${ECR_REPO}:${GIT_SHA}"
 docker push "${ECR_REPO}:${GIT_SHA}"
 docker push "${ECR_REPO}:latest"
 ```
+
+## AWS Data & Secrets Hardening (Phase 5 Slice 5.2)
+
+Slice 5.2 adds the minimum secure data/runtime layer needed before ECS service deployment:
+
+| Resource                             | Scope                                                  |
+| ------------------------------------ | ------------------------------------------------------ |
+| RDS PostgreSQL                       | single-AZ, encrypted, private-subnet dev instance      |
+| DB secret (`ecommerce-erp/db/dev`)   | host, port, db name, username, password, DSN           |
+| App secret (`ecommerce-erp/app/dev`) | API auth values + optional Tavily key                  |
+| ECS IAM roles                        | task execution + app task role with secret-read access |
+| App security group                   | ready to attach to ECS tasks in Slice 5.3              |
+
+### Cost-conscious defaults
+
+- `db_instance_class = "db.t3.micro"`
+- `publicly_accessible = false`
+- `backup_retention_period = 1`
+- `deletion_protection = false`
+- `skip_final_snapshot = true` (dev only)
+
+### Apply patterns
+
+```bash
+cd infra/terraform/environments/dev
+
+# Lowest-cost dev path: RDS in private subnets, NAT off
+terraform plan
+terraform apply
+
+# Private-subnet / no-NAT path with endpoints suitable for Secrets Manager + ECR + logs
+terraform plan -var="enable_vpc_endpoints=true"
+terraform apply -var="enable_vpc_endpoints=true"
+```
+
+### Inputs you will usually override locally
+
+Use a local ignored `terraform.tfvars` or `-var` flags for anything sensitive:
+
+```hcl
+# terraform.tfvars (ignored by git)
+tavily_api_key = "..."
+api_basic_auth_user = "admin"
+```
+
+Key outputs after `terraform apply`:
+
+- `db_endpoint`
+- `db_port`
+- `db_secret_arn`
+- `app_runtime_secret_arn`
+- `task_execution_role_arn`
+- `task_role_arn`
+- `app_security_group_id`
 
 ---
 

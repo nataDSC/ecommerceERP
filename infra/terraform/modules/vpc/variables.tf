@@ -51,5 +51,5 @@ variable "enable_vpc_endpoints" {
 variable "interface_endpoint_services" {
   description = "Interface endpoint services to create when enable_vpc_endpoints=true"
   type        = list(string)
-  default     = ["ecr.api", "ecr.dkr", "logs"]
+  default     = ["ecr.api", "ecr.dkr", "logs", "secretsmanager"]
 }

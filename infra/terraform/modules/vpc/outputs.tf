@@ -17,3 +17,8 @@ output "vpc_endpoint_ids" {
   description = "Created VPC endpoint IDs when enable_vpc_endpoints=true"
   value       = concat(aws_vpc_endpoint.s3[*].id, [for endpoint in values(aws_vpc_endpoint.interface) : endpoint.id])
 }
+
+output "vpc_cidr_block" {
+  description = "CIDR block of the VPC"
+  value       = module.vpc.vpc_cidr_block
+}
