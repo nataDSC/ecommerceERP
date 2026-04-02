@@ -106,3 +106,81 @@ variable "tavily_api_key" {
   default     = ""
   sensitive   = true
 }
+
+variable "tavily_mock" {
+  description = "Keep Tavily in mock mode for the initial cloud deployment and smoke tests"
+  type        = bool
+  default     = true
+}
+
+variable "image_tag" {
+  description = "Container image tag to deploy from ECR"
+  type        = string
+  default     = "latest"
+}
+
+variable "service_desired_count" {
+  description = "Desired number of ECS tasks for the API service"
+  type        = number
+  default     = 1
+}
+
+variable "service_task_cpu" {
+  description = "Fargate CPU units for the API task"
+  type        = number
+  default     = 256
+}
+
+variable "service_task_memory" {
+  description = "Fargate memory in MiB for the API task"
+  type        = number
+  default     = 512
+}
+
+variable "service_subnet_type" {
+  description = "Run ECS tasks in public or private subnets"
+  type        = string
+  default     = "public"
+}
+
+variable "service_assign_public_ip" {
+  description = "Assign a public IP to ECS tasks (recommended for cheapest public-subnet dev mode)"
+  type        = bool
+  default     = true
+}
+
+variable "service_health_check_path" {
+  description = "ALB health check path for the API"
+  type        = string
+  default     = "/healthz"
+}
+
+variable "wait_for_service_steady_state" {
+  description = "Wait for ECS service steady state during apply"
+  type        = bool
+  default     = false
+}
+
+variable "enable_service_autoscaling" {
+  description = "Enable target-tracking autoscaling for the ECS service"
+  type        = bool
+  default     = false
+}
+
+variable "service_min_capacity" {
+  description = "Minimum desired task count when autoscaling is enabled"
+  type        = number
+  default     = 1
+}
+
+variable "service_max_capacity" {
+  description = "Maximum desired task count when autoscaling is enabled"
+  type        = number
+  default     = 2
+}
+
+variable "service_autoscaling_cpu_target" {
+  description = "Target average CPU utilization for ECS autoscaling"
+  type        = number
+  default     = 70
+}

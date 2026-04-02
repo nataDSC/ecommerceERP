@@ -82,3 +82,28 @@ output "db_secret_arn" {
   description = "Secrets Manager ARN containing DB connection details"
   value       = module.rds_postgres.db_secret_arn
 }
+
+output "alb_dns_name" {
+  description = "DNS name of the public Application Load Balancer"
+  value       = module.ecs_service.alb_dns_name
+}
+
+output "service_url" {
+  description = "HTTP URL for the public API endpoint"
+  value       = module.ecs_service.service_url
+}
+
+output "ecs_service_name" {
+  description = "ECS service name for the deployed API"
+  value       = module.ecs_service.ecs_service_name
+}
+
+output "task_definition_arn" {
+  description = "Task definition ARN for the API service"
+  value       = module.ecs_service.task_definition_arn
+}
+
+output "cloudwatch_log_group_name" {
+  description = "CloudWatch Logs group receiving API container logs"
+  value       = module.ecs_service.cloudwatch_log_group_name
+}

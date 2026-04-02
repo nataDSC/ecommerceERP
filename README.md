@@ -717,6 +717,76 @@ Key outputs after `terraform apply`:
 - `task_role_arn`
 - `app_security_group_id`
 
+## AWS Service Deployment (Phase 5 Slice 5.3)
+
+Slice 5.3 deploys the API container to ECS Fargate behind a public Application Load Balancer.
+
+| Resource                  | Scope                                        |
+| ------------------------- | -------------------------------------------- |
+| Application Load Balancer | public HTTP entry point for the API          |
+| Target group + listener   | forwards traffic to `/healthz`-checked tasks |
+| ECS task definition       | runs `ecommerce-erp-api` from ECR            |
+| ECS service               | keeps the API running on Fargate             |
+| CloudWatch log group      | captures container logs                      |
+| Optional autoscaling      | CPU-based target tracking, off by default    |
+
+### Dev defaults
+
+- `service_subnet_type = "public"`
+- `service_assign_public_ip = true`
+- `image_tag = "latest"`
+- `tavily_mock = true`
+- `wait_for_service_steady_state = false`
+
+This is the cheapest ECS dev path because it avoids NAT and keeps the first deployment simple.
+
+### Before applying Slice 5.3
+
+Push the image tag you intend to deploy:
+
+```bash
+cd /Users/nataliep/code/portfolio-projects/ecommerceERP
+
+docker build -t ecommerce-erp-api:local .
+aws ecr get-login-password --region us-east-1 \
+  | docker login --username AWS --password-stdin \
+    "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
+
+ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/ecommerce-erp"
+docker tag ecommerce-erp-api:local "${ECR_REPO}:latest"
+docker push "${ECR_REPO}:latest"
+```
+
+### Apply patterns
+
+```bash
+cd infra/terraform/environments/dev
+
+# Cheapest public-subnet ECS deployment
+terraform apply
+
+# Private-subnet ECS deployment (requires NAT or endpoints)
+terraform apply \
+  -var="service_subnet_type=private" \
+  -var="service_assign_public_ip=false" \
+  -var="enable_vpc_endpoints=true"
+```
+
+### Post-apply checks
+
+```bash
+terraform output service_url
+curl -s "$(terraform output -raw service_url)/healthz"
+
+aws ecs describe-services \
+  --cluster ecommerce-erp-dev \
+  --services "$(terraform output -raw ecs_service_name)"
+
+aws logs tail "$(terraform output -raw cloudwatch_log_group_name)" --follow
+```
+
+> Cost note: the ALB adds a real hourly charge even when idle. For short-lived dev testing, destroy Slice 5.3 resources promptly when you are done.
+
 ---
 
 ## Environment variables

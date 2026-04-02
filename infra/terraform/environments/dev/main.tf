@@ -67,3 +67,32 @@ module "app_runtime" {
   tavily_api_key         = var.tavily_api_key
   additional_secret_arns = [module.rds_postgres.db_secret_arn]
 }
+
+module "ecs_service" {
+  source                  = "../../modules/ecs-service"
+  environment             = "dev"
+  vpc_id                  = module.vpc.vpc_id
+  public_subnet_ids       = module.vpc.public_subnet_ids
+  private_subnet_ids      = module.vpc.private_subnet_ids
+  ecs_cluster_arn         = module.ecs_cluster.cluster_arn
+  ecs_cluster_name        = module.ecs_cluster.cluster_name
+  app_security_group_id   = module.app_runtime.app_security_group_id
+  task_execution_role_arn = module.app_runtime.task_execution_role_arn
+  task_role_arn           = module.app_runtime.task_role_arn
+  app_runtime_secret_arn  = module.app_runtime.app_runtime_secret_arn
+  db_secret_arn           = module.rds_postgres.db_secret_arn
+  ecr_repository_url      = module.ecr.repository_url
+  image_tag               = var.image_tag
+  desired_count           = var.service_desired_count
+  task_cpu                = var.service_task_cpu
+  task_memory             = var.service_task_memory
+  service_subnet_type     = var.service_subnet_type
+  assign_public_ip        = var.service_assign_public_ip
+  health_check_path       = var.service_health_check_path
+  wait_for_steady_state   = var.wait_for_service_steady_state
+  enable_autoscaling      = var.enable_service_autoscaling
+  min_capacity            = var.service_min_capacity
+  max_capacity            = var.service_max_capacity
+  autoscaling_cpu_target  = var.service_autoscaling_cpu_target
+  tavily_mock             = var.tavily_mock
+}
