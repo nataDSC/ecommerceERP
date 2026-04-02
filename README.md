@@ -616,12 +616,12 @@ The smoke script validates: `/healthz`, `/api/v1/config`, run creation, approval
 
 Slice 5.1 provisions the AWS infrastructure that all later slices depend on:
 
-| Resource                            | Scope                                |
-| ----------------------------------- | ------------------------------------ |
-| ECR repository (`ecommerce-erp`)    | image registry with scan-on-push     |
-| VPC (`ecommerce-erp-vpc-<env>`)     | 2 AZs, public + private subnets, NAT |
-| ECS cluster (`ecommerce-erp-<env>`) | Fargate + FARGATE_SPOT capacity      |
-| Terraform remote state              | S3 bucket + DynamoDB lock table      |
+| Resource                            | Scope                                                     |
+| ----------------------------------- | --------------------------------------------------------- |
+| ECR repository (`ecommerce-erp`)    | image registry with scan-on-push                          |
+| VPC (`ecommerce-erp-vpc-<env>`)     | 2 AZs, public + private subnets, optional NAT / endpoints |
+| ECS cluster (`ecommerce-erp-<env>`) | Fargate + FARGATE_SPOT capacity                           |
+| Terraform remote state              | S3 bucket + DynamoDB lock table                           |
 
 ### IaC layout
 
@@ -636,6 +636,14 @@ infra/terraform/
 Full step-by-step implementation checklist, naming conventions, and verification commands are in:
 
 - [`docs/phase5-slice5.1-checklist.md`](docs/phase5-slice5.1-checklist.md)
+
+### Network options for dev
+
+- **Default / cheapest:** `terraform apply` → NAT off, endpoints off
+- **NAT practice:** `terraform apply -var="enable_nat_gateway=true"`
+- **Private-subnet / no-NAT practice:** `terraform apply -var="enable_vpc_endpoints=true"`
+
+> `VPC endpoints` improve isolation, but interface endpoints also have hourly cost. For the absolute cheapest dev path, keep both NAT and endpoints off and use public subnets when you later deploy ECS services.
 
 ### Quick-start (after Terraform apply)
 

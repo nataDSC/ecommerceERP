@@ -21,11 +21,13 @@ provider "aws" {
 }
 
 module "vpc" {
-  source      = "../../modules/vpc"
-  environment = "dev"
-  aws_region  = var.aws_region
-  enable_nat_gateway = var.enable_nat_gateway
-  single_nat_gateway = var.single_nat_gateway
+  source                      = "../../modules/vpc"
+  environment                 = "dev"
+  aws_region                  = var.aws_region
+  enable_nat_gateway          = var.enable_nat_gateway
+  single_nat_gateway          = var.single_nat_gateway
+  enable_vpc_endpoints        = var.enable_vpc_endpoints
+  interface_endpoint_services = var.interface_endpoint_services
 }
 
 module "ecr" {

@@ -175,9 +175,10 @@ output "repository_url" {
 Key design decisions:
 
 - 2 Availability Zones minimum (3 recommended for prod)
-- Public subnets → ALB, NAT Gateways
+- Public subnets → ALB and the cheapest ECS dev/test path
 - Private subnets → ECS tasks, RDS (Slice 5.2)
-- Single NAT Gateway for dev (cost saving); one per AZ for prod
+- NAT is optional and now defaults to **off** in `dev`
+- VPC endpoints are optional for private-subnet / no-NAT mode; use them for isolation, not because they are always cheaper
 
 ```hcl
 module "vpc" {
@@ -185,24 +186,31 @@ module "vpc" {
   version = "~> 5.0"
 
   name = "ecommerce-erp-vpc-${var.environment}"
-  cidr = "10.0.0.0/16"
+  cidr = var.vpc_cidr
 
-  azs             = ["${var.aws_region}a", "${var.aws_region}b"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+  azs             = formatlist("${var.aws_region}%s", ["a", "b"])
+  private_subnets = var.private_subnet_cidrs
+  public_subnets  = var.public_subnet_cidrs
 
-  enable_nat_gateway   = true
-  single_nat_gateway   = var.environment != "prod"  # one per AZ in prod
+  enable_nat_gateway   = var.enable_nat_gateway
+  single_nat_gateway   = var.single_nat_gateway
   enable_dns_hostnames = true
   enable_dns_support   = true
+}
 
-  tags = {
-    Project     = "ecommerce-erp"
-    Environment = var.environment
-    ManagedBy   = "terraform"
-  }
+resource "aws_vpc_endpoint" "s3" {
+  count = var.enable_vpc_endpoints ? 1 : 0
+  # Interface endpoints for `ecr.api`, `ecr.dkr`, and `logs` are also optional.
 }
 ```
+
+### Network mode quick reference
+
+| Mode                | Terraform flags                    | Best for                        | Cost note                                                       |
+| ------------------- | ---------------------------------- | ------------------------------- | --------------------------------------------------------------- |
+| Public-subnet dev   | none (defaults)                    | cheapest AWS dev/test path      | lowest cost                                                     |
+| NAT practice        | `-var="enable_nat_gateway=true"`   | learning private egress via NAT | NAT is usually the largest fixed cost                           |
+| Private + endpoints | `-var="enable_vpc_endpoints=true"` | no-NAT private-subnet pattern   | more isolated, but interface endpoints also have hourly charges |
 
 > Uses the [terraform-aws-modules/vpc](https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws) community module — battle-tested, no custom code to maintain.
 
@@ -286,9 +294,13 @@ provider "aws" {
 }
 
 module "vpc" {
-  source      = "../../modules/vpc"
-  environment = "dev"
-  aws_region  = var.aws_region
+  source                   = "../../modules/vpc"
+  environment              = "dev"
+  aws_region               = var.aws_region
+  enable_nat_gateway       = var.enable_nat_gateway
+  single_nat_gateway       = var.single_nat_gateway
+  enable_vpc_endpoints     = var.enable_vpc_endpoints
+  interface_endpoint_services = var.interface_endpoint_services
 }
 
 module "ecr" {
@@ -313,19 +325,26 @@ cd infra/terraform/environments/dev
 terraform init \
   -backend-config="bucket=${TF_STATE_BUCKET}"
 
-# Review the plan
+# Cheapest dev default: NAT off, endpoints off
 terraform plan
-
-# Apply (creates VPC, ECR repo, ECS cluster)
 terraform apply
+
+# NAT practice mode (single NAT Gateway)
+terraform plan -var="enable_nat_gateway=true" -var="single_nat_gateway=true"
+terraform apply -var="enable_nat_gateway=true" -var="single_nat_gateway=true"
+
+# Private-subnet / no-NAT mode using VPC endpoints
+terraform plan -var="enable_vpc_endpoints=true"
+terraform apply -var="enable_vpc_endpoints=true"
 ```
 
 Expected output (approximate):
 
 ```
-Plan: 18 to add, 0 to change, 0 to destroy.
-...
-Apply complete! Resources: 18 added, 0 changed, 0 destroyed.
+Plan size varies by network mode:
+- ~18 resources: NAT off, endpoints off
+- ~23 resources: single NAT enabled
+- ~22-26 resources: endpoints enabled (depends on services selected)
 
 Outputs:
 ecr_repository_url    = "123456789.dkr.ecr.us-east-1.amazonaws.com/ecommerce-erp"
@@ -333,7 +352,10 @@ ecs_cluster_name      = "ecommerce-erp-dev"
 vpc_id                = "vpc-0abc..."
 private_subnet_ids    = ["subnet-0...", "subnet-0..."]
 public_subnet_ids     = ["subnet-0...", "subnet-0..."]
+vpc_endpoint_ids      = []  # or populated when enable_vpc_endpoints=true
 ```
+
+> Use the same `-var` flags with `terraform destroy` that you used with `terraform apply`.
 
 ---
 

@@ -41,3 +41,15 @@ variable "single_nat_gateway" {
   type        = bool
   default     = true
 }
+
+variable "enable_vpc_endpoints" {
+  description = "Create VPC endpoints for private-subnet, no-NAT access to AWS services"
+  type        = bool
+  default     = false
+}
+
+variable "interface_endpoint_services" {
+  description = "Interface endpoint services to create when enable_vpc_endpoints=true"
+  type        = list(string)
+  default     = ["ecr.api", "ecr.dkr", "logs"]
+}

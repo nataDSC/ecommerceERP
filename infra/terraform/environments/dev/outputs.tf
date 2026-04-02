@@ -27,3 +27,8 @@ output "public_subnet_ids" {
   description = "Public subnet IDs (for ALB)"
   value       = module.vpc.public_subnet_ids
 }
+
+output "vpc_endpoint_ids" {
+  description = "VPC endpoint IDs created for private-subnet / no-NAT mode"
+  value       = module.vpc.vpc_endpoint_ids
+}
