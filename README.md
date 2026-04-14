@@ -650,17 +650,11 @@ Full step-by-step implementation checklist, naming conventions, and verification
 ### Quick-start (after Terraform apply)
 
 ```bash
-# Authenticate Docker to ECR
-aws ecr get-login-password --region us-east-1 \
-  | docker login --username AWS --password-stdin \
-    "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
-
-# Push the image built in Phase 4
-GIT_SHA=$(git rev-parse --short HEAD)
-ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/ecommerce-erp"
-docker tag ecommerce-erp-api:local "${ECR_REPO}:${GIT_SHA}"
-docker push "${ECR_REPO}:${GIT_SHA}"
-docker push "${ECR_REPO}:latest"
+# Build and push an AWS-compatible image to ECR.
+# This defaults to linux/amd64 to avoid Apple Silicon -> ECS mismatches.
+export AWS_PROFILE=alex-aws
+export AWS_DEFAULT_REGION=us-east-1
+./scripts/push-ecr-image
 ```
 
 ## AWS Data & Secrets Hardening (Phase 5 Slice 5.2)
@@ -747,14 +741,16 @@ Push the image tag you intend to deploy:
 ```bash
 cd /Users/nataliep/code/portfolio-projects/ecommerceERP
 
-docker build -t ecommerce-erp-api:local .
-aws ecr get-login-password --region us-east-1 \
-  | docker login --username AWS --password-stdin \
-    "${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com"
+# Safe default for ECS/Fargate on this project
+export AWS_PROFILE=alex-aws
+export AWS_DEFAULT_REGION=us-east-1
+./scripts/push-ecr-image
+```
 
-ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/ecommerce-erp"
-docker tag ecommerce-erp-api:local "${ECR_REPO}:latest"
-docker push "${ECR_REPO}:latest"
+If you need a custom tag:
+
+```bash
+IMAGE_TAG=demo ./scripts/push-ecr-image
 ```
 
 ### Apply patterns

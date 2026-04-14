@@ -366,20 +366,11 @@ vpc_endpoint_ids      = []  # or populated when enable_vpc_endpoints=true
 Confirm the local Docker image can push to the new registry:
 
 ```bash
-# Authenticate Docker to ECR
-aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" \
-  | docker login --username AWS --password-stdin \
-    "${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
-
-# Tag and push the image built locally in Phase 4
-ECR_REPO="${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/ecommerce-erp"
-GIT_SHA=$(git rev-parse --short HEAD)
-
-docker tag ecommerce-erp-api:local "${ECR_REPO}:${GIT_SHA}"
-docker tag ecommerce-erp-api:local "${ECR_REPO}:latest"
-
-docker push "${ECR_REPO}:${GIT_SHA}"
-docker push "${ECR_REPO}:latest"
+# Build and push an AWS-compatible image.
+# Defaults to linux/amd64 so Apple Silicon local builds remain ECS-safe.
+export AWS_PROFILE=alex-aws
+export AWS_DEFAULT_REGION=us-east-1
+./scripts/push-ecr-image
 ```
 
 Run ECR scan results check (optional but recommended):

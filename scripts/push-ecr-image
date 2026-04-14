@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Build and push an AWS-compatible container image to ECR.
+
+Defaults:
+- Platform: linux/amd64
+- Repository: <account>.dkr.ecr.<region>.amazonaws.com/ecommerce-erp
+- Tags pushed: latest and current git SHA
+
+Examples:
+  AWS_PROFILE=alex-aws ./scripts/push-ecr-image
+  AWS_PROFILE=alex-aws IMAGE_TAG=demo ./scripts/push-ecr-image
+  AWS_PROFILE=alex-aws DOCKER_PLATFORM=linux/arm64 ./scripts/push-ecr-image
+  DRY_RUN=1 ./scripts/push-ecr-image
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+command -v aws >/dev/null 2>&1 || {
+  echo "aws CLI is required" >&2
+  exit 1
+}
+
+command -v docker >/dev/null 2>&1 || {
+  echo "docker is required" >&2
+  exit 1
+}
+
+AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+REPOSITORY_NAME="${REPOSITORY_NAME:-ecommerce-erp}"
+GIT_SHA="${GIT_SHA:-$(git rev-parse --short HEAD)}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+DRY_RUN="${DRY_RUN:-0}"
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  ACCOUNT_ID="${ACCOUNT_ID:-123456789012}"
+else
+  if ! ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"; then
+    echo "Unable to determine AWS account. Set AWS_PROFILE or export temporary credentials first." >&2
+    exit 1
+  fi
+fi
+
+ECR_REPO="${ECR_REPO:-${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${REPOSITORY_NAME}}"
+
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "DRY RUN"
+  echo "Region:      ${AWS_DEFAULT_REGION}"
+  echo "Platform:    ${DOCKER_PLATFORM}"
+  echo "Repository:  ${ECR_REPO}"
+  echo "Tags:        ${IMAGE_TAG}, ${GIT_SHA}"
+  echo "Command: docker buildx build --platform ${DOCKER_PLATFORM} -t ${ECR_REPO}:${IMAGE_TAG} -t ${ECR_REPO}:${GIT_SHA} --push ."
+  exit 0
+fi
+
+echo "==> Logging in to ECR: ${ECR_REPO}"
+aws ecr get-login-password --region "${AWS_DEFAULT_REGION}" \
+  | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+
+echo "==> Ensuring buildx builder is available"
+if ! docker buildx inspect >/dev/null 2>&1; then
+  docker buildx create --use >/dev/null
+fi
+
+echo "==> Building and pushing ${DOCKER_PLATFORM} image"
+docker buildx build \
+  --platform "${DOCKER_PLATFORM}" \
+  -t "${ECR_REPO}:${IMAGE_TAG}" \
+  -t "${ECR_REPO}:${GIT_SHA}" \
+  --push \
+  .
+
+echo "==> Done"
+echo "Pushed tags: ${ECR_REPO}:${IMAGE_TAG} and ${ECR_REPO}:${GIT_SHA}"
