@@ -397,7 +397,8 @@ Current dev completion status:
 - Completed: Slice 5.3 ECS Fargate deployment with public ALB routing for both the API and the Streamlit UI.
 - Completed: architecture-safe image publishing for AWS through a local helper and GitHub Actions.
 - Completed: automatic dev deployment after successful image publish in GitHub Actions.
-- Remaining later work: HTTPS, WAF, alarms, staged promotion, and production approvals.
+- Completed: optional HTTPS and custom-domain Terraform support is scaffolded for activation.
+- Remaining later work: WAF, alarms, staged promotion, and production approvals.
 
 Planned next slices:
 
@@ -773,6 +774,31 @@ terraform apply \
   -var="service_subnet_type=private" \
   -var="service_assign_public_ip=false" \
   -var="enable_vpc_endpoints=true"
+```
+
+### Optional HTTPS and custom domain activation
+
+When you are ready to use a real domain, the Terraform now supports ACM-backed HTTPS and Route 53 alias creation.
+
+Typical activation pattern:
+
+```bash
+cd infra/terraform/environments/dev
+
+terraform apply \
+  -var="enable_https=true" \
+  -var="domain_name=demo.yourdomain.com" \
+  -var="route53_zone_id=Z123EXAMPLE" \
+  -var="create_route53_record=true"
+```
+
+If you already have an ACM certificate, you can reuse it instead:
+
+```bash
+terraform apply \
+  -var="enable_https=true" \
+  -var="domain_name=demo.yourdomain.com" \
+  -var="certificate_arn=arn:aws:acm:us-east-1:123456789012:certificate/your-cert-id"
 ```
 
 ### Post-apply checks

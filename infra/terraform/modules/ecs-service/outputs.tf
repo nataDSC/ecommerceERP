@@ -47,3 +47,18 @@ output "ui_url" {
   description = "HTTP URL for the public Streamlit UI"
   value       = var.enable_ui ? "http://${aws_lb.this.dns_name}" : null
 }
+
+output "https_url" {
+  description = "HTTPS URL for the public application when HTTPS is enabled"
+  value       = var.enable_https ? "https://${coalesce(var.domain_name, aws_lb.this.dns_name)}" : null
+}
+
+output "custom_domain_url" {
+  description = "Custom domain URL when Route 53 or an external certificate-backed domain is configured"
+  value       = var.domain_name != null ? format("%s://%s", var.enable_https ? "https" : "http", var.domain_name) : null
+}
+
+output "certificate_arn" {
+  description = "ACM certificate ARN attached to the ALB when HTTPS is enabled"
+  value       = var.enable_https ? coalesce(var.certificate_arn, try(aws_acm_certificate_validation.this[0].certificate_arn, null)) : null
+}

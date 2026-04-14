@@ -220,3 +220,39 @@ variable "ui_health_check_path" {
   type        = string
   default     = "/_stcore/health"
 }
+
+variable "enable_https" {
+  description = "Enable HTTPS on the ALB for the dev environment"
+  type        = bool
+  default     = false
+}
+
+variable "certificate_arn" {
+  description = "Optional existing ACM certificate ARN for HTTPS"
+  type        = string
+  default     = null
+}
+
+variable "domain_name" {
+  description = "Optional custom domain for the dev environment"
+  type        = string
+  default     = null
+}
+
+variable "route53_zone_id" {
+  description = "Optional Route 53 hosted zone ID for ACM validation and alias records"
+  type        = string
+  default     = null
+}
+
+variable "subject_alternative_names" {
+  description = "Optional SANs for a managed ACM certificate"
+  type        = list(string)
+  default     = []
+}
+
+variable "create_route53_record" {
+  description = "Create the Route 53 alias record for the dev custom domain"
+  type        = bool
+  default     = false
+}

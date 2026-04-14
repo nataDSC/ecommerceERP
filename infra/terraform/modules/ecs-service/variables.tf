@@ -194,3 +194,39 @@ variable "ui_task_memory" {
   type        = number
   default     = 512
 }
+
+variable "enable_https" {
+  description = "Enable HTTPS on the public ALB"
+  type        = bool
+  default     = false
+}
+
+variable "certificate_arn" {
+  description = "Existing ACM certificate ARN to attach to the HTTPS listener"
+  type        = string
+  default     = null
+}
+
+variable "domain_name" {
+  description = "Optional custom domain name for the public application"
+  type        = string
+  default     = null
+}
+
+variable "route53_zone_id" {
+  description = "Optional Route 53 hosted zone ID used for ACM DNS validation and alias record creation"
+  type        = string
+  default     = null
+}
+
+variable "subject_alternative_names" {
+  description = "Optional SANs for a managed ACM certificate"
+  type        = list(string)
+  default     = []
+}
+
+variable "create_route53_record" {
+  description = "Create a Route 53 alias record for the custom domain"
+  type        = bool
+  default     = false
+}

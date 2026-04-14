@@ -98,6 +98,21 @@ output "ui_url" {
   value       = module.ecs_service.ui_url
 }
 
+output "https_url" {
+  description = "HTTPS URL for the public application when enabled"
+  value       = module.ecs_service.https_url
+}
+
+output "custom_domain_url" {
+  description = "Custom domain URL when configured"
+  value       = module.ecs_service.custom_domain_url
+}
+
+output "certificate_arn" {
+  description = "ACM certificate ARN used by the ALB when HTTPS is enabled"
+  value       = module.ecs_service.certificate_arn
+}
+
 output "ecs_service_name" {
   description = "ECS service name for the deployed API"
   value       = module.ecs_service.ecs_service_name

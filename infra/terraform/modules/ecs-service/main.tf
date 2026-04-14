@@ -7,9 +7,12 @@ locals {
     ManagedBy   = "terraform"
   }
 
-  service_subnet_ids = var.service_subnet_type == "private" ? var.private_subnet_ids : var.public_subnet_ids
-  container_name     = "ecommerce-erp-api"
-  ui_container_name  = "ecommerce-erp-ui"
+  service_subnet_ids         = var.service_subnet_type == "private" ? var.private_subnet_ids : var.public_subnet_ids
+  container_name             = "ecommerce-erp-api"
+  ui_container_name          = "ecommerce-erp-ui"
+  create_managed_certificate = var.enable_https && var.certificate_arn == null && var.domain_name != null && var.route53_zone_id != null
+  default_target_group_arn   = var.enable_ui ? aws_lb_target_group.ui[0].arn : aws_lb_target_group.api.arn
+  app_listener_arn           = var.enable_https ? aws_lb_listener.https[0].arn : aws_lb_listener.http.arn
   container_env = [
     {
       name  = "API_HOST"
@@ -124,6 +127,18 @@ resource "aws_security_group_rule" "ui_ingress_from_alb" {
   description              = "Allow ALB traffic to the Streamlit UI"
 }
 
+resource "aws_security_group_rule" "alb_https_ingress" {
+  count = var.enable_https ? 1 : 0
+
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.alb.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "HTTPS from the internet"
+}
+
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/aws/ecs/ecommerce-erp-${var.environment}"
   retention_in_days = var.log_retention_days
@@ -191,21 +206,107 @@ resource "aws_lb_target_group" "ui" {
   })
 }
 
+resource "aws_acm_certificate" "this" {
+  count = local.create_managed_certificate ? 1 : 0
+
+  domain_name               = var.domain_name
+  subject_alternative_names = var.subject_alternative_names
+  validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "ecommerce-erp-${var.environment}-cert"
+  })
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = local.create_managed_certificate ? {
+    for dvo in aws_acm_certificate.this[0].domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  } : {}
+
+  zone_id = var.route53_zone_id
+  name    = each.value.name
+  type    = each.value.type
+  ttl     = 60
+  records = [each.value.record]
+}
+
+resource "aws_acm_certificate_validation" "this" {
+  count = local.create_managed_certificate ? 1 : 0
+
+  certificate_arn         = aws_acm_certificate.this[0].arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+resource "aws_route53_record" "app_alias" {
+  count = var.create_route53_record && var.domain_name != null && var.route53_zone_id != null ? 1 : 0
+
+  zone_id = var.route53_zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.this.dns_name
+    zone_id                = aws_lb.this.zone_id
+    evaluate_target_health = true
+  }
+}
+
 resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.this.arn
   port              = 80
   protocol          = "HTTP"
 
+  dynamic "default_action" {
+    for_each = var.enable_https ? [1] : []
+
+    content {
+      type = "redirect"
+
+      redirect {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
+  }
+
+  dynamic "default_action" {
+    for_each = var.enable_https ? [] : [1]
+
+    content {
+      type             = "forward"
+      target_group_arn = local.default_target_group_arn
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  count = var.enable_https ? 1 : 0
+
+  load_balancer_arn = aws_lb.this.arn
+  port              = 443
+  protocol          = "HTTPS"
+  ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+  certificate_arn   = coalesce(var.certificate_arn, aws_acm_certificate_validation.this[0].certificate_arn)
+
   default_action {
     type             = "forward"
-    target_group_arn = var.enable_ui ? aws_lb_target_group.ui[0].arn : aws_lb_target_group.api.arn
+    target_group_arn = local.default_target_group_arn
   }
 }
 
 resource "aws_lb_listener_rule" "api_paths" {
   count = var.enable_ui ? 1 : 0
 
-  listener_arn = aws_lb_listener.http.arn
+  listener_arn = local.app_listener_arn
   priority     = 10
 
   action {
