@@ -158,3 +158,39 @@ variable "tavily_mock" {
   type        = bool
   default     = true
 }
+
+variable "enable_ui" {
+  description = "Whether to deploy the Streamlit UI on the same ALB"
+  type        = bool
+  default     = false
+}
+
+variable "ui_container_port" {
+  description = "Application container port exposed by the Streamlit UI"
+  type        = number
+  default     = 8501
+}
+
+variable "ui_health_check_path" {
+  description = "ALB health check path for the Streamlit UI"
+  type        = string
+  default     = "/_stcore/health"
+}
+
+variable "ui_desired_count" {
+  description = "Desired number of ECS tasks for the UI service"
+  type        = number
+  default     = 1
+}
+
+variable "ui_task_cpu" {
+  description = "Fargate task CPU units for the UI task"
+  type        = number
+  default     = 256
+}
+
+variable "ui_task_memory" {
+  description = "Fargate task memory in MiB for the UI task"
+  type        = number
+  default     = 512
+}

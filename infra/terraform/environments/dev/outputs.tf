@@ -89,8 +89,13 @@ output "alb_dns_name" {
 }
 
 output "service_url" {
-  description = "HTTP URL for the public API endpoint"
+  description = "Base HTTP URL for the public application load balancer"
   value       = module.ecs_service.service_url
+}
+
+output "ui_url" {
+  description = "HTTP URL for the public Streamlit UI"
+  value       = module.ecs_service.ui_url
 }
 
 output "ecs_service_name" {
@@ -106,4 +111,9 @@ output "task_definition_arn" {
 output "cloudwatch_log_group_name" {
   description = "CloudWatch Logs group receiving API container logs"
   value       = module.ecs_service.cloudwatch_log_group_name
+}
+
+output "ui_service_name" {
+  description = "ECS service name for the deployed Streamlit UI"
+  value       = module.ecs_service.ui_service_name
 }

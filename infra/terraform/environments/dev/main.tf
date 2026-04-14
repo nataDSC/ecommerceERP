@@ -95,4 +95,10 @@ module "ecs_service" {
   max_capacity            = var.service_max_capacity
   autoscaling_cpu_target  = var.service_autoscaling_cpu_target
   tavily_mock             = var.tavily_mock
+  enable_ui               = var.enable_ui
+  ui_desired_count        = var.ui_desired_count
+  ui_task_cpu             = var.ui_task_cpu
+  ui_task_memory          = var.ui_task_memory
+  ui_container_port       = var.ui_container_port
+  ui_health_check_path    = var.ui_health_check_path
 }

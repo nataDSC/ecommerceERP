@@ -184,3 +184,39 @@ variable "service_autoscaling_cpu_target" {
   type        = number
   default     = 70
 }
+
+variable "enable_ui" {
+  description = "Deploy the Streamlit UI on the public ALB"
+  type        = bool
+  default     = true
+}
+
+variable "ui_desired_count" {
+  description = "Desired task count for the Streamlit UI service"
+  type        = number
+  default     = 1
+}
+
+variable "ui_task_cpu" {
+  description = "Fargate CPU units for the Streamlit UI"
+  type        = number
+  default     = 256
+}
+
+variable "ui_task_memory" {
+  description = "Fargate memory in MiB for the Streamlit UI"
+  type        = number
+  default     = 512
+}
+
+variable "ui_container_port" {
+  description = "Container port for the Streamlit UI"
+  type        = number
+  default     = 8501
+}
+
+variable "ui_health_check_path" {
+  description = "Health check path for the Streamlit UI target group"
+  type        = string
+  default     = "/_stcore/health"
+}

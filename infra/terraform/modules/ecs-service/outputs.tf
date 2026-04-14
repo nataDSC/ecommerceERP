@@ -34,6 +34,16 @@ output "cloudwatch_log_group_name" {
 }
 
 output "service_url" {
-  description = "HTTP URL for the public API endpoint"
+  description = "Base HTTP URL for the public application load balancer"
   value       = "http://${aws_lb.this.dns_name}"
+}
+
+output "ui_service_name" {
+  description = "ECS service name for the Streamlit UI"
+  value       = var.enable_ui ? aws_ecs_service.ui[0].name : null
+}
+
+output "ui_url" {
+  description = "HTTP URL for the public Streamlit UI"
+  value       = var.enable_ui ? "http://${aws_lb.this.dns_name}" : null
 }
