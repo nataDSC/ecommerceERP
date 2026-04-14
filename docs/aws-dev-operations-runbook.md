@@ -15,7 +15,7 @@ curl -s "$(terraform output -raw service_url)/healthz"
 Expected response:
 
 ```json
-{"status":"ok"}
+{ "status": "ok" }
 ```
 
 ---
@@ -151,7 +151,25 @@ Current Step A observability includes:
 
 ---
 
-## 9. Common quick diagnosis flow
+## 9. Check the WAF status
+
+```bash
+cd infra/terraform/environments/dev
+terraform output waf_web_acl_name
+```
+
+Optional AWS CLI check:
+
+```bash
+export AWS_PROFILE=alex-aws
+export AWS_DEFAULT_REGION=us-east-1
+
+aws wafv2 list-web-acls --scope REGIONAL
+```
+
+---
+
+## 10. Common quick diagnosis flow
 
 If the app looks down:
 
@@ -159,6 +177,7 @@ If the app looks down:
 2. check ECS service counts
 3. inspect ECS events
 4. tail CloudWatch logs
-5. force a new deployment if needed
+5. check the WAF status
+6. force a new deployment if needed
 
 That sequence usually identifies the problem quickly.

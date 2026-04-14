@@ -35,14 +35,14 @@ Do **not** add X-Ray or complex tracing yet unless there is a clear need.
 
 ## AWS services needed
 
-| Service | Required? | What we use it for | Rough dev cost estimate |
-| ------- | --------- | ------------------ | ----------------------- |
-| CloudWatch Logs | Yes | ECS API/UI logs, retention policy | Usually low; often $0–$5/month for a mostly idle demo |
-| CloudWatch Metrics | Yes | ALB, ECS, RDS health metrics | Basic AWS service metrics are generally already available |
-| CloudWatch Alarms | Yes | app-down / unhealthy-target / restart alerts | Usually low; often a few dollars/month total for a small set |
-| CloudWatch Dashboard | Recommended | single-pane demo status view | Low cost for one simple dashboard |
-| SNS | Optional | email alerts when alarms fire | Very low for occasional email notifications |
-| X-Ray / tracing | Not yet | only add later if request-level debugging becomes necessary | Skip for now |
+| Service              | Required?   | What we use it for                                          | Rough dev cost estimate                                      |
+| -------------------- | ----------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
+| CloudWatch Logs      | Yes         | ECS API/UI logs, retention policy                           | Usually low; often $0–$5/month for a mostly idle demo        |
+| CloudWatch Metrics   | Yes         | ALB, ECS, RDS health metrics                                | Basic AWS service metrics are generally already available    |
+| CloudWatch Alarms    | Yes         | app-down / unhealthy-target / restart alerts                | Usually low; often a few dollars/month total for a small set |
+| CloudWatch Dashboard | Recommended | single-pane demo status view                                | Low cost for one simple dashboard                            |
+| SNS                  | Optional    | email alerts when alarms fire                               | Very low for occasional email notifications                  |
+| X-Ray / tracing      | Not yet     | only add later if request-level debugging becomes necessary | Skip for now                                                 |
 
 > **Practical dev expectation:** observability should stay much cheaper than the ALB, Fargate tasks, or RDS.
 

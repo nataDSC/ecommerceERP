@@ -89,6 +89,7 @@ module "ecs_service" {
   service_subnet_type     = var.service_subnet_type
   assign_public_ip        = var.service_assign_public_ip
   health_check_path       = var.service_health_check_path
+  alb_ingress_cidr_blocks = var.alb_ingress_cidr_blocks
   wait_for_steady_state   = var.wait_for_service_steady_state
   enable_autoscaling      = var.enable_service_autoscaling
   min_capacity            = var.service_min_capacity
@@ -119,4 +120,12 @@ module "observability" {
   alarm_action_arns   = var.observability_alarm_action_arns
   create_sns_topic    = var.enable_observability_sns
   alert_email_address = var.observability_alert_email
+}
+
+module "waf" {
+  source                   = "../../modules/waf"
+  environment              = "dev"
+  alb_arn                  = module.ecs_service.alb_arn
+  create_waf               = var.enable_waf
+  rate_limit_per_5_minutes = var.waf_rate_limit_per_5_minutes
 }

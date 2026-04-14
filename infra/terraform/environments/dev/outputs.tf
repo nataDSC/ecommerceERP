@@ -132,3 +132,13 @@ output "observability_sns_topic_arn" {
   description = "SNS topic ARN for dev alarm notifications when enabled"
   value       = module.observability.sns_topic_arn
 }
+
+output "waf_web_acl_name" {
+  description = "AWS WAF web ACL name protecting the dev ALB"
+  value       = module.waf.web_acl_name
+}
+
+output "waf_web_acl_arn" {
+  description = "AWS WAF web ACL ARN protecting the dev ALB"
+  value       = module.waf.web_acl_arn
+}

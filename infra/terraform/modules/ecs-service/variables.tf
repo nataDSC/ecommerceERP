@@ -117,6 +117,12 @@ variable "alb_deletion_protection" {
   default     = false
 }
 
+variable "alb_ingress_cidr_blocks" {
+  description = "CIDR blocks allowed to reach the public ALB"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
 variable "log_retention_days" {
   description = "CloudWatch log retention in days"
   type        = number

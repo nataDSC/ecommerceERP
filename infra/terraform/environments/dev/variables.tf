@@ -155,6 +155,12 @@ variable "service_health_check_path" {
   default     = "/healthz"
 }
 
+variable "alb_ingress_cidr_blocks" {
+  description = "CIDR blocks allowed to reach the public ALB"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
 variable "wait_for_service_steady_state" {
   description = "Wait for ECS service steady state during apply"
   type        = bool
@@ -219,6 +225,18 @@ variable "ui_health_check_path" {
   description = "Health check path for the Streamlit UI target group"
   type        = string
   default     = "/_stcore/health"
+}
+
+variable "enable_waf" {
+  description = "Create the baseline AWS WAF protection for the dev ALB"
+  type        = bool
+  default     = true
+}
+
+variable "waf_rate_limit_per_5_minutes" {
+  description = "Maximum requests per 5-minute window from one IP before the WAF blocks it"
+  type        = number
+  default     = 1000
 }
 
 variable "enable_observability_dashboard" {

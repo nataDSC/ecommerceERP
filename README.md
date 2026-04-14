@@ -397,16 +397,18 @@ Current dev completion status:
 - Completed: Slice 5.3 ECS Fargate deployment with public ALB routing for both the API and the Streamlit UI.
 - Completed: architecture-safe image publishing for AWS through a local helper and GitHub Actions.
 - Completed: automatic dev deployment after successful image publish in GitHub Actions.
+- Completed: Slice 5.4 baseline AWS WAF protections are now live on the current public ALB URL, with configurable ALB ingress CIDR guardrails.
 - Completed: Phase 5.5 Step A observability basics with a CloudWatch dashboard and core alarms.
-- Completed: Phase 5.5 Step B scaffolding for SNS notifications and the dev operations runbook.
-- Remaining later work: HTTPS, WAF, enabling email subscriptions, staged promotion, and production approvals.
+- Completed: Phase 5.5 Step B SNS notifications and the dev operations runbook, verified end-to-end by email.
+- Remaining later work: HTTPS/custom domain readiness, tighter inbound allowlisting as needed, staged promotion, and production approvals.
 
 Planned next slices:
 
 - Slice 5.4: Edge and security controls
-  - Configure HTTPS with ACM certificates and Route53 DNS records.
-  - Add AWS WAF baseline protections at the ALB layer.
-  - Restrict inbound access by CIDR/rules as needed for internal endpoints.
+  - Baseline AWS WAF protections are now deployed on the current ALB-based URL.
+  - Configure HTTPS with ACM certificates and Route53 DNS records when a custom domain is ready.
+  - Tighten inbound access by CIDR/rules as needed for internal endpoints.
+  - Implementation checklist: [docs/phase5-slice5.4-checklist.md](docs/phase5-slice5.4-checklist.md)
 
 - Slice 5.5: Observability and operations
   - Send container logs to CloudWatch Logs with retention policies.
