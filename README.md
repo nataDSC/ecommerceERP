@@ -395,7 +395,8 @@ Current dev completion status:
 - Completed: Slice 5.1 platform and networking foundation on AWS.
 - Completed: Slice 5.2 RDS PostgreSQL, Secrets Manager, and least-privilege IAM runtime setup.
 - Completed: Slice 5.3 ECS Fargate deployment with public ALB routing for both the API and the Streamlit UI.
-- Completed: architecture-safe image publishing for AWS through a local helper and a GitHub Actions workflow.
+- Completed: architecture-safe image publishing for AWS through a local helper and GitHub Actions.
+- Completed: automatic dev deployment after successful image publish in GitHub Actions.
 - Remaining later work: HTTPS, WAF, alarms, staged promotion, and production approvals.
 
 Planned next slices:
@@ -747,18 +748,17 @@ If you need a custom tag:
 IMAGE_TAG=demo ./scripts/push-ecr-image
 ```
 
-### Automated AWS image publish via GitHub Actions
+### Automated AWS image publish and dev deploy via GitHub Actions
 
 A manual and push-triggered workflow now exists at `.github/workflows/publish-aws-image.yml`.
-It always builds for `linux/amd64`, which avoids Apple Silicon to ECS architecture mismatches.
+It always builds for `linux/amd64`, which avoids Apple Silicon to ECS architecture mismatches, and then automatically deploys the exact pushed image tag to the dev AWS environment.
 
 Repository configuration needed before using the workflow:
 
 - GitHub secret: `AWS_ACCESS_KEY_ID`
 - GitHub secret: `AWS_SECRET_ACCESS_KEY`
-- Optional GitHub variable: `AWS_REGION` (defaults to `us-east-1`)
 
-After those are set, you can run the workflow from the GitHub Actions tab or let it publish automatically on `main` when app container files change.
+After those are set, you can run the workflow from the GitHub Actions tab or let it publish and deploy automatically on `main` when app container files change.
 
 ### Apply patterns
 
@@ -813,7 +813,7 @@ export AWS_DEFAULT_REGION=us-east-1
 bash infra/terraform/scripts/deploy-stack-53.sh
 ```
 
-This helper republishes the latest AWS-compatible image, runs `terraform apply`, waits for ECS to stabilize, and prints the live service URL.
+This helper bootstraps ECR if needed, republishes the latest AWS-compatible image, runs `terraform apply`, waits for ECS to stabilize, and prints the live service URL.
 
 ---
 

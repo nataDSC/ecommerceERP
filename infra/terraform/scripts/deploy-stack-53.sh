@@ -27,15 +27,20 @@ echo "Region: ${AWS_DEFAULT_REGION}"
 echo "State bucket: ${TF_STATE_BUCKET}"
 echo
 
+echo "== Terraform init check =="
+cd "${DEV_DIR}"
+terraform init -input=false >/dev/null
+
+echo "== Bootstrapping ECR if needed =="
+terraform apply -auto-approve -target=module.ecr
+
+echo
+cd "${ROOT_DIR}"
 echo "== Publishing latest AWS-compatible image =="
 ./scripts/push-ecr-image
 
 echo
 cd "${DEV_DIR}"
-
-echo "== Terraform init check =="
-terraform init -input=false >/dev/null
-
 echo "== Terraform apply =="
 terraform apply -auto-approve
 

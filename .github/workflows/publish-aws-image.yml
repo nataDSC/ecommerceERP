@@ -1,4 +1,4 @@
-name: Publish AWS Image
+name: Publish and Deploy Dev to AWS
 
 on:
   workflow_dispatch:
@@ -21,15 +21,24 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: aws-dev-deploy
+  cancel-in-progress: true
+
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: ecommerce-erp
   DOCKER_PLATFORM: linux/amd64
+  TF_WORKING_DIR: infra/terraform/environments/dev
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
+    outputs:
+      account_id: ${{ steps.prep.outputs.account_id }}
+      image_uri: ${{ steps.prep.outputs.image_uri }}
+      sha_tag: ${{ steps.prep.outputs.sha_tag }}
 
     steps:
       - name: Checkout
@@ -38,15 +47,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Prepare image metadata
         id: prep
@@ -58,10 +67,13 @@ jobs:
           ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
           SHA_TAG="${GITHUB_SHA::7}"
           IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+          TF_STATE_BUCKET="ecommerce-erp-tfstate-${ACCOUNT_ID}"
 
           {
+            echo "account_id=${ACCOUNT_ID}"
             echo "image_uri=${IMAGE_URI}"
             echo "sha_tag=${SHA_TAG}"
+            echo "tf_state_bucket=${TF_STATE_BUCKET}"
           } >> "$GITHUB_OUTPUT"
 
           TAGS="${IMAGE_URI}:${SHA_TAG},${IMAGE_URI}:latest"
@@ -70,6 +82,17 @@ jobs:
           fi
 
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Bootstrap ECR if needed
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config="bucket=${{ steps.prep.outputs.tf_state_bucket }}"
+          terraform apply -auto-approve -target=module.ecr
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push linux amd64 image
         uses: docker/build-push-action@v6
@@ -84,3 +107,45 @@ jobs:
         run: |
           echo "Published image: ${{ steps.prep.outputs.image_uri }}:${{ steps.prep.outputs.sha_tag }}"
           echo "Published image: ${{ steps.prep.outputs.image_uri }}:latest"
+
+  deploy-dev:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform init \
+            -input=false \
+            -backend-config="bucket=ecommerce-erp-tfstate-${{ needs.publish.outputs.account_id }}"
+
+      - name: Deploy dev stack with exact image tag
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform apply -auto-approve -var="image_tag=${{ needs.publish.outputs.sha_tag }}"
+
+      - name: Wait for ECS services
+        run: |
+          aws ecs wait services-stable --cluster ecommerce-erp-dev --services ecommerce-erp-api-dev ecommerce-erp-ui-dev
+
+      - name: Verify live health
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          SERVICE_URL="$(terraform output -raw service_url)"
+          echo "Service URL: ${SERVICE_URL}"
+          curl -fsS "${SERVICE_URL}/healthz"
