@@ -795,7 +795,7 @@ aws logs tail "$(terraform output -raw cloudwatch_log_group_name)" --follow
 For long-term cost control, you can destroy the dev stack and re-apply it later.
 The helper script at `infra/terraform/scripts/destroy-stack-52.sh` is valid for this purpose and now supports `AWS_PROFILE`-based credential export.
 
-Typical use:
+Typical disable use:
 
 ```bash
 export AWS_PROFILE=alex-aws
@@ -803,7 +803,17 @@ export AWS_DEFAULT_REGION=us-east-1
 bash infra/terraform/scripts/destroy-stack-52.sh
 ```
 
-This destroys the Terraform-managed demo resources while leaving the remote Terraform backend in place so the stack can be brought back with a later `terraform apply`.
+To bring the demo back later, either run plain Terraform apply from the dev environment or use the convenience helper at `infra/terraform/scripts/deploy-stack-53.sh`.
+
+Typical re-enable use:
+
+```bash
+export AWS_PROFILE=alex-aws
+export AWS_DEFAULT_REGION=us-east-1
+bash infra/terraform/scripts/deploy-stack-53.sh
+```
+
+This helper republishes the latest AWS-compatible image, runs `terraform apply`, waits for ECS to stabilize, and prints the live service URL.
 
 ---
 
