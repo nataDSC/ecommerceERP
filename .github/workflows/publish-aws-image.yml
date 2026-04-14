@@ -1,0 +1,86 @@
+name: Publish AWS Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional extra image tag to push in addition to latest and the commit SHA
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - pyproject.toml
+      - src/**
+      - streamlit_app.py
+      - scripts/push-ecr-image
+      - .github/workflows/publish-aws-image.yml
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ecommerce-erp
+  DOCKER_PLATFORM: linux/amd64
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Prepare image metadata
+        id: prep
+        shell: bash
+        env:
+          EXTRA_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
+          SHA_TAG="${GITHUB_SHA::7}"
+          IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+
+          {
+            echo "image_uri=${IMAGE_URI}"
+            echo "sha_tag=${SHA_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+          TAGS="${IMAGE_URI}:${SHA_TAG},${IMAGE_URI}:latest"
+          if [[ -n "${EXTRA_TAG:-}" && "${EXTRA_TAG}" != "latest" ]]; then
+            TAGS="${TAGS},${IMAGE_URI}:${EXTRA_TAG}"
+          fi
+
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push linux amd64 image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ env.DOCKER_PLATFORM }}
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}
+          provenance: false
+
+      - name: Publish summary
+        run: |
+          echo "Published image: ${{ steps.prep.outputs.image_uri }}:${{ steps.prep.outputs.sha_tag }}"
+          echo "Published image: ${{ steps.prep.outputs.image_uri }}:latest"

@@ -390,21 +390,15 @@ For Postgres backend, `db_target` is intentionally sanitized and excludes user/p
 
 Goal: production-grade, secure, observable deployment on AWS with staged rollout.
 
-- Slice 5.1: Platform and networking foundation
-  - Choose runtime target: ECS Fargate (recommended default) or App Runner.
-  - Provision VPC, public/private subnets, NAT, security groups.
-  - Provision ECR repository for image storage.
-  - Define IaC baseline (Terraform or CloudFormation) for repeatable environments.
+Current dev completion status:
 
-- Slice 5.2: Data and secrets hardening
-  - Use managed Postgres target (Amazon RDS PostgreSQL) or approved external Postgres.
-  - Move runtime secrets to AWS Secrets Manager (DB DSN, API auth credentials, Tavily key).
-  - Use least-privilege IAM roles for task execution and application access.
+- Completed: Slice 5.1 platform and networking foundation on AWS.
+- Completed: Slice 5.2 RDS PostgreSQL, Secrets Manager, and least-privilege IAM runtime setup.
+- Completed: Slice 5.3 ECS Fargate deployment with public ALB routing for both the API and the Streamlit UI.
+- Completed: architecture-safe image publishing for AWS through a local helper and a GitHub Actions workflow.
+- Remaining later work: HTTPS, WAF, alarms, staged promotion, and production approvals.
 
-- Slice 5.3: Service deployment
-  - Build and push versioned image tags to ECR.
-  - Deploy API service on ECS Fargate behind an Application Load Balancer.
-  - Add health checks, autoscaling policy, and rolling deployment configuration.
+Planned next slices:
 
 - Slice 5.4: Edge and security controls
   - Configure HTTPS with ACM certificates and Route53 DNS records.
@@ -417,7 +411,7 @@ Goal: production-grade, secure, observable deployment on AWS with staged rollout
   - Create runbook for rollback, secret rotation, and incident triage.
 
 - Slice 5.6: Delivery workflow and promotion
-  - Extend CI/CD to publish images and deploy to dev, then stage, then prod.
+  - Extend CI/CD to deploy to dev, then stage, then prod.
   - Add smoke tests post-deploy against health and core API workflow endpoints.
   - Use environment-based approvals for production promotion.
 
@@ -753,6 +747,19 @@ If you need a custom tag:
 IMAGE_TAG=demo ./scripts/push-ecr-image
 ```
 
+### Automated AWS image publish via GitHub Actions
+
+A manual and push-triggered workflow now exists at `.github/workflows/publish-aws-image.yml`.
+It always builds for `linux/amd64`, which avoids Apple Silicon to ECS architecture mismatches.
+
+Repository configuration needed before using the workflow:
+
+- GitHub secret: `AWS_ACCESS_KEY_ID`
+- GitHub secret: `AWS_SECRET_ACCESS_KEY`
+- Optional GitHub variable: `AWS_REGION` (defaults to `us-east-1`)
+
+After those are set, you can run the workflow from the GitHub Actions tab or let it publish automatically on `main` when app container files change.
+
 ### Apply patterns
 
 ```bash
@@ -781,7 +788,22 @@ aws ecs describe-services \
 aws logs tail "$(terraform output -raw cloudwatch_log_group_name)" --follow
 ```
 
-> Cost note: the ALB adds a real hourly charge even when idle. For short-lived dev testing, destroy Slice 5.3 resources promptly when you are done.
+> Cost note: the ALB adds a real hourly charge even when idle. For short-lived dev testing, destroy the dev stack promptly when you are done.
+
+### Long-term disabling of the demo stack
+
+For long-term cost control, you can destroy the dev stack and re-apply it later.
+The helper script at `infra/terraform/scripts/destroy-stack-52.sh` is valid for this purpose and now supports `AWS_PROFILE`-based credential export.
+
+Typical use:
+
+```bash
+export AWS_PROFILE=alex-aws
+export AWS_DEFAULT_REGION=us-east-1
+bash infra/terraform/scripts/destroy-stack-52.sh
+```
+
+This destroys the Terraform-managed demo resources while leaving the remote Terraform backend in place so the stack can be brought back with a later `terraform apply`.
 
 ---
 

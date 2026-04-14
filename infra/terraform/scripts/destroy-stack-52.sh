@@ -1,15 +1,34 @@
+#!/usr/bin/env bash
 set -euo pipefail
 
-export AWS_DEFAULT_REGION=us-east-1
-export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export TF_STATE_BUCKET="ecommerce-erp-tfstate-${ACCOUNT_ID}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEV_DIR="$(cd "${SCRIPT_DIR}/../environments/dev" && pwd)"
 
-cd /Users/nataliep/code/portfolio-projects/ecommerceERP/infra/terraform/environments/dev
+export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-1}"
+
+if [[ -n "${AWS_PROFILE:-}" ]]; then
+  echo "== Exporting credentials for AWS_PROFILE=${AWS_PROFILE} =="
+  if CREDS="$(aws configure export-credentials --profile "${AWS_PROFILE}" --format env 2>/dev/null)"; then
+    eval "${CREDS}"
+  else
+    echo "Warning: could not export credentials from AWS_PROFILE; continuing with current shell environment." >&2
+  fi
+fi
+
+export ACCOUNT_ID="${ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+export TF_STATE_BUCKET="${TF_STATE_BUCKET:-ecommerce-erp-tfstate-${ACCOUNT_ID}}"
+
+cd "${DEV_DIR}"
 
 echo "== Identity =="
 aws sts get-caller-identity
 echo "Region: ${AWS_DEFAULT_REGION}"
 echo "State bucket: ${TF_STATE_BUCKET}"
+echo "Terraform dir: ${DEV_DIR}"
+echo
+
+echo "== Terraform init check =="
+terraform init -input=false >/dev/null
 echo
 
 echo "== Current Terraform outputs =="
@@ -20,13 +39,18 @@ echo "== Destroy preview =="
 terraform plan -destroy
 echo
 
-read -p "Type YES to destroy the current AWS stack: " CONFIRM
-if [ "${CONFIRM}" != "YES" ]; then
+if [[ "${AUTO_APPROVE_DESTROY:-0}" == "1" ]]; then
+  CONFIRM="YES"
+else
+  read -r -p "Type YES to destroy the current AWS demo stack: " CONFIRM
+fi
+
+if [[ "${CONFIRM}" != "YES" ]]; then
   echo "Aborted."
   exit 1
 fi
 
-echo "== Destroying Terraform-managed stack =="
+echo "== Destroying Terraform-managed demo stack =="
 terraform destroy -auto-approve
 echo
 
@@ -46,4 +70,4 @@ aws ecr describe-repositories \
   --query 'repositories[].repositoryName' || true
 
 echo
-echo "✅ Stack destroy completed (or best-effort checked)"
+echo "Stack destroy completed. The remote Terraform backend remains so you can re-apply later."
