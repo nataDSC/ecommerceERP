@@ -397,7 +397,9 @@ Current dev completion status:
 - Completed: Slice 5.3 ECS Fargate deployment with public ALB routing for both the API and the Streamlit UI.
 - Completed: architecture-safe image publishing for AWS through a local helper and GitHub Actions.
 - Completed: automatic dev deployment after successful image publish in GitHub Actions.
-- Remaining later work: HTTPS, WAF, alarms, staged promotion, and production approvals.
+- Completed: Phase 5.5 Step A observability basics with a CloudWatch dashboard and core alarms.
+- Completed: Phase 5.5 Step B scaffolding for SNS notifications and the dev operations runbook.
+- Remaining later work: HTTPS, WAF, enabling email subscriptions, staged promotion, and production approvals.
 
 Planned next slices:
 
@@ -410,6 +412,8 @@ Planned next slices:
   - Send container logs to CloudWatch Logs with retention policies.
   - Add CloudWatch alarms (5xx rate, latency, task restarts, health-check failures).
   - Create runbook for rollback, secret rotation, and incident triage.
+  - Implementation checklist: [docs/phase5-slice5.5-checklist.md](docs/phase5-slice5.5-checklist.md)
+  - Dev operations runbook: [docs/aws-dev-operations-runbook.md](docs/aws-dev-operations-runbook.md)
 
 - Slice 5.6: Delivery workflow and promotion
   - Extend CI/CD to deploy to dev, then stage, then prod.
@@ -630,9 +634,10 @@ infra/terraform/
   environments/dev/      # root module for dev (staging + prod follow same pattern)
 ```
 
-Full step-by-step implementation checklist, naming conventions, and verification commands are in:
+Full step-by-step implementation checklists, naming conventions, and verification commands are in:
 
-- [`docs/phase5-slice5.1-checklist.md`](docs/phase5-slice5.1-checklist.md)
+- [docs/phase5-slice5.1-checklist.md](docs/phase5-slice5.1-checklist.md)
+- [docs/phase5-slice5.5-checklist.md](docs/phase5-slice5.5-checklist.md)
 
 ### Network options for dev
 

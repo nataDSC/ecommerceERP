@@ -102,3 +102,21 @@ module "ecs_service" {
   ui_container_port       = var.ui_container_port
   ui_health_check_path    = var.ui_health_check_path
 }
+
+module "observability" {
+  source              = "../../modules/observability"
+  environment         = "dev"
+  aws_region          = var.aws_region
+  ecs_cluster_name    = module.ecs_cluster.cluster_name
+  api_service_name    = module.ecs_service.ecs_service_name
+  api_desired_count   = var.service_desired_count
+  ui_service_name     = module.ecs_service.ui_service_name
+  alb_arn             = module.ecs_service.alb_arn
+  target_group_arn    = module.ecs_service.target_group_arn
+  db_identifier       = module.rds_postgres.db_identifier
+  create_dashboard    = var.enable_observability_dashboard
+  create_alarms       = var.enable_observability_alarms
+  alarm_action_arns   = var.observability_alarm_action_arns
+  create_sns_topic    = var.enable_observability_sns
+  alert_email_address = var.observability_alert_email
+}

@@ -220,3 +220,33 @@ variable "ui_health_check_path" {
   type        = string
   default     = "/_stcore/health"
 }
+
+variable "enable_observability_dashboard" {
+  description = "Create the low-cost CloudWatch dashboard for the dev environment"
+  type        = bool
+  default     = true
+}
+
+variable "enable_observability_alarms" {
+  description = "Create the core CloudWatch alarms for the dev environment"
+  type        = bool
+  default     = true
+}
+
+variable "observability_alarm_action_arns" {
+  description = "Optional alarm action ARNs, such as an SNS topic, for the dev environment"
+  type        = list(string)
+  default     = []
+}
+
+variable "enable_observability_sns" {
+  description = "Create an SNS topic for observability alerts in the dev environment"
+  type        = bool
+  default     = false
+}
+
+variable "observability_alert_email" {
+  description = "Optional email address for dev alarm notifications"
+  type        = string
+  default     = null
+}

@@ -117,3 +117,18 @@ output "ui_service_name" {
   description = "ECS service name for the deployed Streamlit UI"
   value       = module.ecs_service.ui_service_name
 }
+
+output "observability_dashboard_name" {
+  description = "CloudWatch dashboard name for the dev environment"
+  value       = module.observability.dashboard_name
+}
+
+output "observability_alarm_names" {
+  description = "Core CloudWatch alarm names for the dev environment"
+  value       = module.observability.alarm_names
+}
+
+output "observability_sns_topic_arn" {
+  description = "SNS topic ARN for dev alarm notifications when enabled"
+  value       = module.observability.sns_topic_arn
+}
