@@ -3,9 +3,12 @@
 A LangGraph-powered **Plan → Act → Reflect** agent that analyses internal ERP
 inventory data, fetches competitor market intelligence via Tavily, and produces
 a structured restock proposal with full auditability.
+<br><br>
+Link to the public deployment of the application on Streamlit: [ Ecommerce ERP Inventory Agent ](https://ecommerce-erp-demo.streamlit.app)
+<br>
+Link to the public deployment of the application on AWS: [ Ecommerce ERP Inventory Agent AWS ](http://ecommerce-erp-dev-190914093.us-east-1.elb.amazonaws.com)
 
 ---
-
 ---
 
 # The Project
