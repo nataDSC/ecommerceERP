@@ -6,7 +6,7 @@ a structured restock proposal with full auditability.
 <br><br>
 Link to the public deployment of the application on Streamlit: [ Ecommerce ERP Inventory Agent ](https://ecommerce-erp-demo.streamlit.app)
 <br>
-Link to the public deployment of the application on AWS: [ Ecommerce ERP Inventory Agent AWS ](http://ecommerce-erp-dev-190914093.us-east-1.elb.amazonaws.com)
+When demo requested, it will be deployed on AWS at: [ Ecommerce ERP Inventory Agent AWS ](http://ecommerce-erp-dev-190914093.us-east-1.elb.amazonaws.com)
 
 ---
 ---
